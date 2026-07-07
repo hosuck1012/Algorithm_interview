@@ -1,0 +1,14 @@
+# VSCode 설정
+.vscode/
+
+# 컴파일/디버그 자동 생성 파일
+*.exe
+*.obj
+*.pdb
+*.ilk
+
+# Visual Studio 관련 폴더
+.vs/
+Debug/
+Release/
+x64/
