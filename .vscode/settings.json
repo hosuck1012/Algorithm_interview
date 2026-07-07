@@ -1,0 +1,9 @@
+{
+    "files.exclude": {
+        "**/*.exe": true,
+        "**/*.obj": true,
+        "**/*.pdb": true,
+        "**/*.ilk": true,
+        "**/vc140.pdb": true
+    }
+}
