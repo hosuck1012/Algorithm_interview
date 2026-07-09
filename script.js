@@ -59,6 +59,7 @@ const pointer = {
 
 const keys = new Set();
 const stars = [];
+const milkyWayDust = [];
 const starContext = starCanvas.getContext("2d");
 const lineContext = constellationCanvas.getContext("2d");
 let memoryNodes = [];
@@ -68,6 +69,7 @@ let projectedMemories = [];
 dateInput.valueAsDate = new Date();
 setupCanvases();
 createStars();
+createMilkyWayDust();
 bindEvents();
 renderData({ warpToActive: true });
 
@@ -444,6 +446,7 @@ function clearCanvases() {
 
 function drawStarfield() {
   starContext.save();
+  drawMilkyWay();
 
   stars.forEach((star) => {
     const projected = projectWorld(star);
@@ -696,6 +699,79 @@ function setupCanvases() {
   lineContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 }
 
+function createMilkyWayDust() {
+  milkyWayDust.length = 0;
+
+  for (let index = 0; index < 320; index += 1) {
+    const softOffset = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+    milkyWayDust.push({
+      u: Math.random() * 1.18 - 0.09,
+      v: softOffset,
+      size: Math.random() * 1.9 + 0.35,
+      alpha: Math.random() * 0.34 + 0.12,
+      color: ["124, 244, 255", "255, 255, 255", "255, 224, 138", "255, 181, 235"][Math.floor(Math.random() * 4)],
+    });
+  }
+}
+
+function drawMilkyWay() {
+  const driftX = Math.sin(camera.yaw) * 34;
+  const driftY = Math.sin(camera.pitch) * 30;
+
+  starContext.save();
+  starContext.globalCompositeOperation = "screen";
+  starContext.translate(scene.centerX + driftX, scene.centerY + driftY);
+  starContext.rotate(-0.38);
+
+  const bandWidth = scene.width * 1.55;
+  const bandHeight = scene.height * 0.38;
+  const bandGradient = starContext.createLinearGradient(-bandWidth / 2, 0, bandWidth / 2, 0);
+  bandGradient.addColorStop(0, "rgba(124, 244, 255, 0)");
+  bandGradient.addColorStop(0.32, "rgba(124, 244, 255, 0.08)");
+  bandGradient.addColorStop(0.48, "rgba(255, 255, 255, 0.13)");
+  bandGradient.addColorStop(0.58, "rgba(255, 224, 138, 0.08)");
+  bandGradient.addColorStop(0.72, "rgba(255, 116, 212, 0.07)");
+  bandGradient.addColorStop(1, "rgba(124, 244, 255, 0)");
+
+  starContext.filter = "blur(10px)";
+  starContext.fillStyle = bandGradient;
+  starContext.fillRect(-bandWidth / 2, -bandHeight / 2, bandWidth, bandHeight);
+  starContext.filter = "none";
+
+  drawNebulaCloud(-scene.width * 0.24, -scene.height * 0.03, scene.width * 0.22, "124, 244, 255", 0.13);
+  drawNebulaCloud(scene.width * 0.18, scene.height * 0.05, scene.width * 0.18, "255, 116, 212", 0.1);
+  drawNebulaCloud(scene.width * 0.34, -scene.height * 0.08, scene.width * 0.14, "255, 224, 138", 0.08);
+
+  milkyWayDust.forEach((dust) => {
+    const x = (dust.u - 0.5) * bandWidth;
+    const y = dust.v * bandHeight * 0.58;
+    const radius = dust.size;
+
+    starContext.beginPath();
+    starContext.fillStyle = `rgba(${dust.color}, ${dust.alpha})`;
+    starContext.shadowColor = `rgba(${dust.color}, ${dust.alpha + 0.1})`;
+    starContext.shadowBlur = radius * 4.8;
+    starContext.arc(x, y, radius, 0, Math.PI * 2);
+    starContext.fill();
+  });
+
+  starContext.restore();
+}
+
+function drawNebulaCloud(x, y, radius, color, alpha) {
+  starContext.save();
+  starContext.scale(1, 0.48);
+  const scaledY = y / 0.48;
+  const gradient = starContext.createRadialGradient(x, scaledY, 0, x, scaledY, radius);
+  gradient.addColorStop(0, `rgba(${color}, ${alpha})`);
+  gradient.addColorStop(0.45, `rgba(${color}, ${alpha * 0.45})`);
+  gradient.addColorStop(1, `rgba(${color}, 0)`);
+  starContext.fillStyle = gradient;
+  starContext.beginPath();
+  starContext.arc(x, scaledY, radius, 0, Math.PI * 2);
+  starContext.fill();
+  starContext.restore();
+}
 function createStars() {
   stars.length = 0;
 
