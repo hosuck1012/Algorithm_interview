@@ -1,0 +1,680 @@
+﻿:root {
+  color-scheme: dark;
+  --bg: #05070d;
+  --ink: #f5f8ff;
+  --muted: #aeb9cc;
+  --line: rgba(220, 235, 255, 0.18);
+  --panel: rgba(7, 11, 20, 0.74);
+  --accent: #69e4ff;
+  --accent-2: #ff6fae;
+  --accent-3: #ffd166;
+  --danger: #ff5f6d;
+  --shadow: 0 20px 70px rgba(0, 0, 0, 0.36);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(ellipse at 15% 8%, rgba(105, 228, 255, 0.16), transparent 34%),
+    radial-gradient(ellipse at 78% 18%, rgba(255, 111, 174, 0.13), transparent 28%),
+    radial-gradient(ellipse at 60% 92%, rgba(255, 209, 102, 0.1), transparent 30%),
+    #05070d;
+  color: var(--ink);
+  font-family:
+    "Segoe UI",
+    "Apple SD Gothic Neo",
+    system-ui,
+    sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 76px 76px;
+  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 84%, transparent);
+}
+
+#starCanvas {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), #3ca7ff);
+  color: #031018;
+  cursor: pointer;
+  font-weight: 800;
+  transition:
+    transform 160ms ease,
+    filter 160ms ease,
+    border-color 160ms ease;
+}
+
+button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+.space-viewport:focus-visible,
+.memory-node:focus-visible {
+  outline: 3px solid rgba(105, 228, 255, 0.34);
+  outline-offset: 3px;
+}
+
+.cosmos-app {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  gap: 18px;
+  width: min(1440px, calc(100% - 32px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 18px 0 32px;
+}
+
+.mission-panel,
+.flight-deck,
+.constellation-log {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.mission-panel {
+  position: sticky;
+  top: 18px;
+  align-self: start;
+  display: grid;
+  gap: 20px;
+  padding: 22px;
+}
+
+.mission-copy h1,
+.deck-header h2,
+.section-heading h2,
+.current-memory h2,
+.space-empty h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.mission-copy h1 {
+  max-width: 12ch;
+  font-size: clamp(2.15rem, 4vw, 4rem);
+  line-height: 1.02;
+}
+
+.mission-copy p:not(.eyebrow),
+.space-empty p,
+.current-memory p {
+  margin: 14px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.upload-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.drop-zone {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  border: 1px dashed rgba(105, 228, 255, 0.48);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  cursor: pointer;
+  overflow: hidden;
+  text-align: center;
+}
+
+.drop-zone.is-dragging {
+  border-color: var(--accent-3);
+  background: rgba(255, 209, 102, 0.08);
+}
+
+.drop-zone input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.drop-zone__preview {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.drop-zone.has-preview .drop-zone__preview {
+  opacity: 0.6;
+}
+
+.drop-zone.has-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5, 7, 13, 0.12), rgba(5, 7, 13, 0.76));
+}
+
+.drop-zone__icon,
+.drop-zone__text {
+  position: relative;
+  z-index: 1;
+}
+
+.drop-zone__icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 50%;
+  background: rgba(105, 228, 255, 0.12);
+  box-shadow: 0 0 34px rgba(105, 228, 255, 0.18);
+  color: var(--accent);
+  font-size: 2rem;
+  font-weight: 300;
+}
+
+.drop-zone__text {
+  font-weight: 800;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(220, 235, 255, 0.18);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+}
+
+select option {
+  color: #07101a;
+}
+
+.upload-panel button {
+  min-height: 48px;
+}
+
+.flight-deck {
+  min-width: 0;
+  padding: 16px;
+}
+
+.deck-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: end;
+  padding: 6px 4px 14px;
+}
+
+.deck-header h2 {
+  font-size: clamp(1.4rem, 2.7vw, 2.4rem);
+}
+
+.flight-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.flight-stats span {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.space-viewport {
+  position: relative;
+  min-height: 650px;
+  border: 1px solid rgba(220, 235, 255, 0.13);
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at 52% 52%, rgba(105, 228, 255, 0.12), transparent 24%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.008));
+  cursor: grab;
+  overflow: hidden;
+  perspective: 1200px;
+  user-select: none;
+}
+
+.space-viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.space-grid {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(105, 228, 255, 0.08), transparent 1px),
+    linear-gradient(90deg, rgba(255, 111, 174, 0.07), transparent 1px);
+  background-size: 90px 90px;
+  transform: rotateX(62deg) translateY(150px);
+  transform-origin: center bottom;
+  opacity: 0.35;
+}
+
+.space-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(5, 7, 13, 0.76), transparent 46%, rgba(5, 7, 13, 0.88));
+}
+
+.memory-space {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.memory-node {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: var(--z);
+  width: clamp(150px, 20vw, 250px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(6, 10, 18, 0.78);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.36),
+    0 0 42px rgba(105, 228, 255, 0.1);
+  cursor: pointer;
+  overflow: hidden;
+  transform:
+    translate3d(calc(-50% + var(--x)), calc(-50% + var(--y)), var(--depth))
+    scale(var(--scale))
+    rotate(var(--tilt));
+  transform-origin: center;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    opacity 180ms ease,
+    transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  opacity: var(--opacity);
+}
+
+.memory-node.is-active {
+  border-color: rgba(105, 228, 255, 0.72);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.44),
+    0 0 70px rgba(105, 228, 255, 0.3),
+    0 0 34px rgba(255, 111, 174, 0.16);
+}
+
+.memory-node img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.node-pulse {
+  position: absolute;
+  inset: -18px;
+  z-index: -1;
+  border: 1px solid rgba(105, 228, 255, 0.28);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.memory-node.is-active .node-pulse {
+  animation: pulse 2.4s ease-out infinite;
+  opacity: 1;
+}
+
+.node-caption {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.node-date {
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.node-caption strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space-empty,
+.current-memory {
+  position: absolute;
+  z-index: 25;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(7, 11, 20, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+.space-empty {
+  left: 50%;
+  top: 46%;
+  display: grid;
+  width: min(520px, calc(100% - 36px));
+  padding: 26px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.space-empty.is-hidden {
+  display: none;
+}
+
+.space-empty h2 {
+  font-size: clamp(1.55rem, 4vw, 2.7rem);
+}
+
+.current-memory {
+  left: 16px;
+  bottom: 16px;
+  width: min(420px, calc(100% - 32px));
+  padding: 18px;
+}
+
+.current-memory h2 {
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  line-height: 1.16;
+}
+
+.current-memory__meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--accent-3);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.navigation-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 10px;
+  align-items: end;
+  padding-top: 14px;
+}
+
+.time-control span {
+  display: flex;
+  justify-content: space-between;
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+  padding: 0;
+}
+
+.navigation-bar button {
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+#clearButton,
+.memory-card__delete {
+  border: 1px solid rgba(255, 95, 109, 0.44);
+  background: rgba(255, 95, 109, 0.12);
+  color: #ffd6da;
+}
+
+.constellation-log {
+  grid-column: 1 / -1;
+  padding: 20px;
+}
+
+.section-heading {
+  margin-bottom: 14px;
+}
+
+.timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.timeline:empty::before {
+  content: "아직 기록된 사진이 없습니다.";
+  display: block;
+  border: 1px dashed rgba(220, 235, 255, 0.18);
+  border-radius: 8px;
+  padding: 18px;
+  color: var(--muted);
+}
+
+.memory-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+  border: 1px solid rgba(220, 235, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  overflow: hidden;
+}
+
+.memory-card.is-active {
+  border-color: rgba(105, 228, 255, 0.6);
+  background: rgba(105, 228, 255, 0.09);
+}
+
+.memory-card__select {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  border-radius: 0;
+  padding: 8px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.memory-card__select:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: none;
+}
+
+.memory-card img {
+  width: 82px;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.memory-card span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.memory-card small,
+.memory-card em {
+  overflow: hidden;
+  color: var(--muted);
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-card__delete {
+  min-width: 58px;
+  border-radius: 0;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.84);
+    opacity: 0.72;
+  }
+
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 1020px) {
+  .cosmos-app {
+    grid-template-columns: 1fr;
+  }
+
+  .mission-panel {
+    position: static;
+    grid-template-columns: minmax(0, 0.9fr) minmax(300px, 1.1fr);
+    align-items: center;
+  }
+
+  .mission-copy h1 {
+    max-width: 16ch;
+  }
+}
+
+@media (max-width: 720px) {
+  .cosmos-app {
+    width: min(100% - 20px, 1440px);
+    padding-top: 10px;
+  }
+
+  .mission-panel,
+  .deck-header,
+  .navigation-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-header {
+    align-items: start;
+  }
+
+  .flight-stats {
+    justify-content: flex-start;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .space-viewport {
+    min-height: 560px;
+  }
+
+  .memory-node {
+    width: clamp(136px, 46vw, 210px);
+  }
+
+  .navigation-bar button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .mission-panel,
+  .flight-deck,
+  .constellation-log {
+    padding: 14px;
+  }
+
+  .drop-zone {
+    min-height: 180px;
+  }
+
+  .space-viewport {
+    min-height: 500px;
+  }
+
+  .current-memory {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: auto;
+  }
+
+  .timeline {
+    grid-template-columns: 1fr;
+  }
+}

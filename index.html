@@ -1,0 +1,137 @@
+﻿<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Our Orbit</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <canvas id="starCanvas" aria-hidden="true"></canvas>
+
+    <main class="cosmos-app">
+      <section class="mission-panel" aria-labelledby="pageTitle">
+        <div class="mission-copy">
+          <p class="eyebrow">Our Orbit</p>
+          <h1 id="pageTitle">우리 둘만의 우주 일지</h1>
+          <p>
+            사진을 올리면 날짜순으로 궤도에 배치됩니다. 마우스로 드래그해
+            우주를 헤엄치고, 휠이나 시간 바를 움직여 순간 사이를 이동하세요.
+          </p>
+        </div>
+
+        <form class="upload-panel" id="uploadForm">
+          <label class="drop-zone" id="dropZone" for="photoInput">
+            <input id="photoInput" type="file" accept="image/*" required />
+            <span class="drop-zone__preview" id="photoPreview"></span>
+            <span class="drop-zone__icon">+</span>
+            <span class="drop-zone__text" id="fileName">사진 선택 또는 드래그</span>
+          </label>
+
+          <div class="field-grid">
+            <label>
+              기록한 사람
+              <select id="ownerInput" required>
+                <option value="나">나</option>
+                <option value="여자친구">여자친구</option>
+                <option value="우리">우리</option>
+              </select>
+            </label>
+            <label>
+              날짜
+              <input id="dateInput" type="date" required />
+            </label>
+          </div>
+
+          <label>
+            한 줄 기억
+            <input
+              id="captionInput"
+              type="text"
+              maxlength="60"
+              placeholder="예: 처음 같이 별을 보던 밤"
+            />
+          </label>
+
+          <button type="submit">궤도에 사진 올리기</button>
+        </form>
+      </section>
+
+      <section class="flight-deck" aria-label="우주 사진 타임라인">
+        <header class="deck-header">
+          <div>
+            <p class="eyebrow">Time Navigation</p>
+            <h2>시간에 따라 떠 있는 사진들</h2>
+          </div>
+          <div class="flight-stats" aria-live="polite">
+            <span id="memoryCount">0개의 순간</span>
+            <span id="activeDate">대기 중</span>
+          </div>
+        </header>
+
+        <div class="space-viewport" id="spaceViewport" tabindex="0">
+          <div class="space-grid" aria-hidden="true"></div>
+          <div class="memory-space" id="memorySpace"></div>
+
+          <div class="space-empty" id="emptyState">
+            <p class="eyebrow">Empty Orbit</p>
+            <h2>첫 사진을 올리면 우주 궤도가 시작됩니다.</h2>
+            <p>사진은 이 브라우저 안에 임시 저장되는 초안 버전입니다.</p>
+          </div>
+
+          <article class="current-memory" id="currentMemory" aria-live="polite">
+            <p class="eyebrow">Current Memory</p>
+            <h2>아직 선택된 사진이 없습니다.</h2>
+            <p>왼쪽에서 사진을 업로드해 첫 번째 별을 만들어보세요.</p>
+          </article>
+        </div>
+
+        <div class="navigation-bar">
+          <label class="time-control">
+            <span>시간 이동</span>
+            <input id="timeSlider" type="range" min="0" max="0" value="0" />
+          </label>
+          <button id="playButton" type="button">자동 항해</button>
+          <button id="clearButton" type="button">전체 삭제</button>
+        </div>
+      </section>
+
+      <section class="constellation-log">
+        <div class="section-heading">
+          <p class="eyebrow">Constellation Log</p>
+          <h2>날짜순 기록</h2>
+        </div>
+        <div class="timeline" id="timeline"></div>
+      </section>
+    </main>
+
+    <template id="memoryNodeTemplate">
+      <article class="memory-node" role="button" tabindex="0">
+        <span class="node-pulse" aria-hidden="true"></span>
+        <img alt="" />
+        <div class="node-caption">
+          <span class="node-date"></span>
+          <strong></strong>
+        </div>
+      </article>
+    </template>
+
+    <template id="timelineItemTemplate">
+      <article class="memory-card">
+        <button class="memory-card__select" type="button">
+          <img alt="" />
+          <span>
+            <small class="memory-card__date"></small>
+            <strong></strong>
+            <em></em>
+          </span>
+        </button>
+        <button class="memory-card__delete" type="button" aria-label="사진 삭제">
+          삭제
+        </button>
+      </article>
+    </template>
+
+    <script src="script.js"></script>
+  </body>
+</html>
