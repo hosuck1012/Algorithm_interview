@@ -91,7 +91,7 @@ function bindEvents() {
       id: createId(),
       owner: ownerInput.value,
       date: dateInput.value,
-      caption: captionInput.value.trim() || "말없이도 오래 기억될 순간",
+      caption: captionInput.value.trim() || "A moment worth remembering",
       imageData,
       isTestMemory: false,
     };
@@ -107,7 +107,7 @@ function bindEvents() {
 
   dateInput.addEventListener("input", () => {
     dateWasManuallyEdited = true;
-    setPhotoDateHint("직접 설정한 날짜가 저장됩니다.");
+    setPhotoDateHint("The date you selected will be saved.");
   });
 
   dropZone.addEventListener("dragover", (event) => {
@@ -149,7 +149,7 @@ function bindEvents() {
 
     autoTour = true;
     tourIndex = activeIndex;
-    playButton.textContent = "순항 정지";
+    playButton.textContent = "Stop cruise";
   });
 
   seedButton.addEventListener("click", () => {
@@ -168,7 +168,7 @@ function bindEvents() {
     if (!memories.length) return;
 
     const confirmed = window.confirm(
-      "올린 사진 기록과 테스트 사진을 이 브라우저에서 모두 삭제할까요?"
+      "Delete all uploaded and sample photos from this browser?"
     );
     if (!confirmed) return;
 
@@ -270,55 +270,45 @@ function assignWorldPositions() {
 
 function assignSolarSystems() {
   solarSystems.length = 0;
-  if (memories.length < 3) return;
+  if (!memories.length) return;
 
-  const step = clamp(Math.floor(memories.length / 9), 4, 12);
+  const anchor = memories[Math.min(Math.floor(memories.length * 0.34), memories.length - 1)].world;
 
-  for (let index = 2; index < memories.length - 1; index += step) {
-    const before = memories[index - 1].world;
-    const after = memories[index].world;
-    const seed = index * 1.618;
-
-    solarSystems.push({
-      x: (before.x + after.x) / 2 + Math.sin(seed) * 340,
-      y: (before.y + after.y) / 2 + Math.cos(seed * 0.7) * 240,
-      z: (before.z + after.z) / 2,
-      sunRadius: 52 + (index % 3) * 10,
-      planets: [
-        { orbit: 124, radius: 10, angle: seed, color: "#8fe9ff" },
-        { orbit: 190, radius: 13, angle: seed + 1.8, color: "#ffd98b" },
-        { orbit: 266, radius: 8, angle: seed + 3.1, color: "#ff9ad8" },
-        { orbit: 345, radius: 12, angle: seed + 4.4, color: "#c7d6ff" },
-      ],
-    });
-  }
+  solarSystems.push({
+    x: anchor.x + 1900,
+    y: anchor.y - 560,
+    z: anchor.z - 960,
+    sunRadius: 138,
+    planets: [
+      { orbit: 330, radius: 22, angle: 0.35, color: "#61d8ff", highlight: "#d8fbff" },
+      { orbit: 540, radius: 36, angle: 2.05, color: "#d5a66f", highlight: "#ffe1a8" },
+      { orbit: 760, radius: 28, angle: 3.55, color: "#76c98a", highlight: "#d6ffd9" },
+      { orbit: 1010, radius: 44, angle: 5.05, color: "#c6a277", highlight: "#f1d9ad", ring: true },
+    ],
+  });
 }
 function assignDeepSpaceObjects() {
   deepSpaceObjects.length = 0;
-  if (memories.length < 4) return;
+  if (!memories.length) return;
 
-  const objectCount = clamp(Math.floor(memories.length / 14), 4, 8);
+  const firstZ = memories[0].world.z;
+  const lastZ = memories[memories.length - 1].world.z;
+  const span = lastZ - firstZ;
+  const placements = [
+    { type: "pillar", x: -2700, y: 1500, depth: 0.08, radius: 820, rotation: -0.28, colorA: "81, 229, 213", colorB: "255, 190, 102" },
+    { type: "spiral", x: 2600, y: 1380, depth: 0.22, radius: 880, rotation: 0.22, colorA: "176, 205, 255", colorB: "255, 226, 155" },
+    { type: "nebula", x: 2380, y: -1380, depth: 0.38, radius: 860, rotation: 0.16, colorA: "255, 126, 202", colorB: "87, 221, 231" },
+    { type: "barred", x: -2920, y: -1220, depth: 0.56, radius: 840, rotation: -0.42, colorA: "174, 198, 255", colorB: "255, 216, 139" },
+    { type: "elliptical", x: -280, y: 1800, depth: 0.74, radius: 920, rotation: 0.38, colorA: "222, 232, 255", colorB: "139, 178, 255" },
+    { type: "nebula", x: 460, y: -1720, depth: 0.9, radius: 820, rotation: 0.08, colorA: "83, 236, 209", colorB: "255, 152, 117" },
+  ];
 
-  for (let index = 0; index < objectCount; index += 1) {
-    const memoryIndex = clamp(
-      Math.floor(((index + 1) / (objectCount + 1)) * memories.length),
-      1,
-      memories.length - 2
-    );
-    const anchor = memories[memoryIndex].world;
-    const seed = (index + 1) * 2.391;
-
+  placements.forEach((placement) => {
     deepSpaceObjects.push({
-      type: index % 2 === 0 ? "spiral" : "nebula",
-      x: anchor.x + Math.cos(seed) * 1300,
-      y: anchor.y + Math.sin(seed * 0.72) * 760,
-      z: anchor.z - 520 - index * 180,
-      radius: index % 2 === 0 ? 360 + (index % 3) * 54 : 430 + (index % 3) * 70,
-      rotation: seed,
-      colorA: index % 3 === 0 ? "124, 244, 255" : "255, 174, 226",
-      colorB: index % 3 === 1 ? "255, 224, 138" : "173, 197, 255",
+      ...placement,
+      z: firstZ + span * placement.depth - 850,
     });
-  }
+  });
 }
 function renderMemoryNodes() {
   memorySpace.innerHTML = "";
@@ -375,7 +365,7 @@ function renderTimeline() {
     image.src = memory.imageData;
     image.alt = memory.caption;
     date.textContent = `${formatDate(memory.date)} · ${memory.owner}`;
-    title.textContent = `${index + 1}번째 좌표`;
+    title.textContent = `Coordinate ${index + 1}`;
     caption.textContent = memory.caption;
 
     selectButton.addEventListener("click", () => {
@@ -528,12 +518,18 @@ function drawDeepSpaceObjects() {
 
   deepSpaceObjects.forEach((object) => {
     const point = projectWorld(object);
-    if (!point.visible || !isNearScreen(point, 520) || point.depth > 24000) return;
+    if (!point.visible || !isNearScreen(point, 620) || point.depth > 28000) return;
 
-    const scale = clamp(point.scale * 1.55, 0.18, 1.1);
+    const scale = clamp(point.scale * 1.85, 0.22, 1.22);
 
     if (object.type === "spiral") {
       drawSpiralGalaxy(object, point, scale);
+    } else if (object.type === "barred") {
+      drawBarredGalaxy(object, point, scale);
+    } else if (object.type === "elliptical") {
+      drawEllipticalGalaxy(object, point, scale);
+    } else if (object.type === "pillar") {
+      drawPillarNebula(object, point, scale);
     } else {
       drawNebula(object, point, scale);
     }
@@ -543,25 +539,25 @@ function drawDeepSpaceObjects() {
 }
 
 function drawSpiralGalaxy(object, point, scale) {
-  const radius = clamp(object.radius * scale, 86, 280);
-  const core = lineContext.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 0.72);
-  core.addColorStop(0, "rgba(255, 255, 255, 0.62)");
-  core.addColorStop(0.25, `rgba(${object.colorA}, 0.28)`);
-  core.addColorStop(1, `rgba(${object.colorB}, 0)`);
+  const radius = clamp(object.radius * scale, 96, 320);
+  const core = lineContext.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 0.78);
+  core.addColorStop(0, "rgba(255, 246, 210, 0.72)");
+  core.addColorStop(0.22, `rgba(${object.colorB}, 0.34)`);
+  core.addColorStop(1, `rgba(${object.colorA}, 0)`);
 
   lineContext.fillStyle = core;
   lineContext.beginPath();
-  lineContext.arc(point.x, point.y, radius * 0.72, 0, Math.PI * 2);
+  lineContext.arc(point.x, point.y, radius * 0.78, 0, Math.PI * 2);
   lineContext.fill();
 
-  for (let arm = 0; arm < 2; arm += 1) {
+  for (let arm = 0; arm < 3; arm += 1) {
     lineContext.beginPath();
-    for (let step = 0; step <= 24; step += 1) {
-      const progress = step / 24;
-      const angle = object.rotation + arm * Math.PI + progress * Math.PI * 1.45;
-      const armRadius = radius * (0.16 + progress * 0.82);
+    for (let step = 0; step <= 28; step += 1) {
+      const progress = step / 28;
+      const angle = object.rotation + arm * ((Math.PI * 2) / 3) + progress * Math.PI * 1.52;
+      const armRadius = radius * (0.14 + progress * 0.86);
       const x = point.x + Math.cos(angle) * armRadius;
-      const y = point.y + Math.sin(angle) * armRadius * 0.46;
+      const y = point.y + Math.sin(angle) * armRadius * 0.44;
 
       if (step === 0) {
         lineContext.moveTo(x, y);
@@ -570,16 +566,107 @@ function drawSpiralGalaxy(object, point, scale) {
       }
     }
 
-    lineContext.strokeStyle = `rgba(${arm === 0 ? object.colorA : object.colorB}, 0.34)`;
-    lineContext.lineWidth = Math.max(1.4, radius * 0.025);
-    lineContext.shadowColor = `rgba(${arm === 0 ? object.colorA : object.colorB}, 0.42)`;
-    lineContext.shadowBlur = 18;
+    lineContext.strokeStyle = `rgba(${arm === 1 ? object.colorB : object.colorA}, 0.34)`;
+    lineContext.lineWidth = Math.max(1.2, radius * 0.018);
+    lineContext.shadowColor = `rgba(${arm === 1 ? object.colorB : object.colorA}, 0.42)`;
+    lineContext.shadowBlur = 16;
     lineContext.stroke();
   }
 }
 
+function drawBarredGalaxy(object, point, scale) {
+  const radius = clamp(object.radius * scale, 96, 310);
+  lineContext.save();
+  lineContext.translate(point.x, point.y);
+  lineContext.rotate(object.rotation);
+
+  const halo = lineContext.createRadialGradient(0, 0, 0, 0, 0, radius);
+  halo.addColorStop(0, "rgba(255, 240, 190, 0.5)");
+  halo.addColorStop(0.44, `rgba(${object.colorA}, 0.18)`);
+  halo.addColorStop(1, `rgba(${object.colorA}, 0)`);
+  lineContext.fillStyle = halo;
+  lineContext.beginPath();
+  lineContext.ellipse(0, 0, radius, radius * 0.52, 0, 0, Math.PI * 2);
+  lineContext.fill();
+
+  lineContext.strokeStyle = `rgba(${object.colorB}, 0.46)`;
+  lineContext.lineWidth = Math.max(3, radius * 0.045);
+  lineContext.shadowColor = `rgba(${object.colorB}, 0.42)`;
+  lineContext.shadowBlur = 18;
+  lineContext.beginPath();
+  lineContext.moveTo(-radius * 0.42, 0);
+  lineContext.lineTo(radius * 0.42, 0);
+  lineContext.stroke();
+
+  for (let side = -1; side <= 1; side += 2) {
+    lineContext.beginPath();
+    lineContext.moveTo(side * radius * 0.16, 0);
+    lineContext.bezierCurveTo(side * radius * 0.38, -radius * 0.34, side * radius * 0.68, -radius * 0.22, side * radius * 0.94, -radius * 0.06);
+    lineContext.strokeStyle = `rgba(${object.colorA}, 0.34)`;
+    lineContext.lineWidth = Math.max(1.4, radius * 0.018);
+    lineContext.stroke();
+  }
+
+  lineContext.restore();
+}
+
+function drawEllipticalGalaxy(object, point, scale) {
+  const radius = clamp(object.radius * scale, 110, 340);
+  lineContext.save();
+  lineContext.translate(point.x, point.y);
+  lineContext.rotate(object.rotation);
+
+  const gradient = lineContext.createRadialGradient(0, 0, 0, 0, 0, radius);
+  gradient.addColorStop(0, "rgba(255, 255, 255, 0.48)");
+  gradient.addColorStop(0.24, `rgba(${object.colorA}, 0.24)`);
+  gradient.addColorStop(0.72, `rgba(${object.colorB}, 0.09)`);
+  gradient.addColorStop(1, `rgba(${object.colorB}, 0)`);
+  lineContext.fillStyle = gradient;
+  lineContext.beginPath();
+  lineContext.ellipse(0, 0, radius, radius * 0.58, 0, 0, Math.PI * 2);
+  lineContext.fill();
+  lineContext.restore();
+}
+
+function drawPillarNebula(object, point, scale) {
+  const radius = clamp(object.radius * scale, 120, 360);
+  lineContext.save();
+  lineContext.translate(point.x, point.y);
+  lineContext.rotate(object.rotation);
+
+  const clouds = [
+    { x: -0.18, y: -0.18, r: 0.62, color: object.colorA, alpha: 0.2 },
+    { x: 0.16, y: 0.12, r: 0.56, color: object.colorB, alpha: 0.16 },
+    { x: -0.04, y: 0.02, r: 0.78, color: "255, 255, 255", alpha: 0.08 },
+  ];
+
+  clouds.forEach((cloud) => {
+    const gradient = lineContext.createRadialGradient(cloud.x * radius, cloud.y * radius, 0, cloud.x * radius, cloud.y * radius, radius * cloud.r);
+    gradient.addColorStop(0, `rgba(${cloud.color}, ${cloud.alpha})`);
+    gradient.addColorStop(0.5, `rgba(${cloud.color}, ${cloud.alpha * 0.34})`);
+    gradient.addColorStop(1, `rgba(${cloud.color}, 0)`);
+    lineContext.fillStyle = gradient;
+    lineContext.beginPath();
+    lineContext.ellipse(cloud.x * radius, cloud.y * radius, radius * cloud.r * 0.7, radius * cloud.r, 0, 0, Math.PI * 2);
+    lineContext.fill();
+  });
+
+  lineContext.strokeStyle = "rgba(30, 21, 38, 0.22)";
+  lineContext.lineWidth = Math.max(7, radius * 0.05);
+  lineContext.shadowBlur = 0;
+  for (let pillar = 0; pillar < 3; pillar += 1) {
+    const x = (pillar - 1) * radius * 0.15;
+    lineContext.beginPath();
+    lineContext.moveTo(x, -radius * 0.42);
+    lineContext.bezierCurveTo(x - radius * 0.18, -radius * 0.1, x + radius * 0.12, radius * 0.22, x - radius * 0.04, radius * 0.54);
+    lineContext.stroke();
+  }
+
+  lineContext.restore();
+}
+
 function drawNebula(object, point, scale) {
-  const radius = clamp(object.radius * scale, 100, 320);
+  const radius = clamp(object.radius * scale, 110, 340);
   const clouds = [
     { x: -0.26, y: -0.06, r: 0.72, color: object.colorA, alpha: 0.18 },
     { x: 0.24, y: 0.1, r: 0.62, color: object.colorB, alpha: 0.15 },
@@ -608,30 +695,42 @@ function drawSolarSystems() {
 
   solarSystems.forEach((system) => {
     const point = projectWorld(system);
-    if (!point.visible || !isNearScreen(point, 260) || point.depth > 15000) return;
+    if (!point.visible || !isNearScreen(point, 520) || point.depth > 16000) return;
 
-    const scale = clamp(point.scale * 2.15, 0.38, 2.2);
-    const sunRadius = clamp(system.sunRadius * scale, 14, 82);
+    const scale = clamp(point.scale * 3.5, 0.72, 3.35);
+    const sunRadius = clamp(system.sunRadius * scale, 86, 260);
     const sunGradient = lineContext.createRadialGradient(
-      point.x,
-      point.y,
+      point.x - sunRadius * 0.28,
+      point.y - sunRadius * 0.28,
       0,
       point.x,
       point.y,
-      sunRadius * 3.3
+      sunRadius * 3.6
     );
-    sunGradient.addColorStop(0, "rgba(255, 236, 160, 0.96)");
-    sunGradient.addColorStop(0.28, "rgba(255, 176, 74, 0.46)");
-    sunGradient.addColorStop(1, "rgba(255, 176, 74, 0)");
+    sunGradient.addColorStop(0, "rgba(255, 255, 232, 1)");
+    sunGradient.addColorStop(0.16, "rgba(255, 229, 131, 0.9)");
+    sunGradient.addColorStop(0.35, "rgba(255, 151, 52, 0.34)");
+    sunGradient.addColorStop(1, "rgba(255, 151, 52, 0)");
 
     lineContext.fillStyle = sunGradient;
     lineContext.beginPath();
-    lineContext.arc(point.x, point.y, sunRadius * 3.3, 0, Math.PI * 2);
+    lineContext.arc(point.x, point.y, sunRadius * 3.6, 0, Math.PI * 2);
     lineContext.fill();
 
-    lineContext.fillStyle = "rgba(255, 231, 146, 0.96)";
-    lineContext.shadowColor = "rgba(255, 213, 96, 0.8)";
-    lineContext.shadowBlur = 18;
+    system.planets.forEach((planet) => {
+      const orbitX = planet.orbit * scale;
+      const orbitY = orbitX * 0.42;
+      lineContext.shadowBlur = 0;
+      lineContext.strokeStyle = "rgba(185, 231, 255, 0.17)";
+      lineContext.lineWidth = Math.max(0.8, scale * 1.2);
+      lineContext.beginPath();
+      lineContext.ellipse(point.x, point.y, orbitX, orbitY, 0, 0, Math.PI * 2);
+      lineContext.stroke();
+    });
+
+    lineContext.fillStyle = "rgba(255, 221, 111, 0.98)";
+    lineContext.shadowColor = "rgba(255, 198, 74, 0.78)";
+    lineContext.shadowBlur = 26;
     lineContext.beginPath();
     lineContext.arc(point.x, point.y, sunRadius, 0, Math.PI * 2);
     lineContext.fill();
@@ -641,25 +740,43 @@ function drawSolarSystems() {
       const orbitY = orbitX * 0.42;
       const planetX = point.x + Math.cos(planet.angle) * orbitX;
       const planetY = point.y + Math.sin(planet.angle) * orbitY;
-      const radius = clamp(planet.radius * scale, 4, 18);
-
-      lineContext.shadowBlur = 0;
-      lineContext.strokeStyle = "rgba(124, 244, 255, 0.16)";
-      lineContext.lineWidth = Math.max(0.6, scale * 1.1);
-      lineContext.beginPath();
-      lineContext.ellipse(point.x, point.y, orbitX, orbitY, 0, 0, Math.PI * 2);
-      lineContext.stroke();
-
-      lineContext.fillStyle = planet.color;
-      lineContext.shadowColor = planet.color;
-      lineContext.shadowBlur = 10;
-      lineContext.beginPath();
-      lineContext.arc(planetX, planetY, radius, 0, Math.PI * 2);
-      lineContext.fill();
+      const radius = clamp(planet.radius * scale, 16, 72);
+      drawRealisticPlanet(planetX, planetY, radius, planet);
     });
   });
 
   lineContext.restore();
+}
+
+function drawRealisticPlanet(x, y, radius, planet) {
+  if (planet.ring) {
+    lineContext.save();
+    lineContext.strokeStyle = "rgba(230, 215, 185, 0.52)";
+    lineContext.lineWidth = Math.max(1.2, radius * 0.11);
+    lineContext.beginPath();
+    lineContext.ellipse(x, y, radius * 1.9, radius * 0.58, -0.28, 0, Math.PI * 2);
+    lineContext.stroke();
+    lineContext.restore();
+  }
+
+  const gradient = lineContext.createRadialGradient(
+    x - radius * 0.42,
+    y - radius * 0.45,
+    radius * 0.08,
+    x,
+    y,
+    radius
+  );
+  gradient.addColorStop(0, planet.highlight);
+  gradient.addColorStop(0.34, planet.color);
+  gradient.addColorStop(1, "rgba(3, 8, 18, 0.86)");
+
+  lineContext.fillStyle = gradient;
+  lineContext.shadowColor = planet.color;
+  lineContext.shadowBlur = radius * 0.75;
+  lineContext.beginPath();
+  lineContext.arc(x, y, radius, 0, Math.PI * 2);
+  lineContext.fill();
 }
 function drawConstellationLines() {
   if (projectedMemories.length < 2) return;
@@ -782,18 +899,18 @@ function updateActiveViews() {
 }
 
 function updateStats() {
-  memoryCount.textContent = `${memories.length}개의 사진 신호`;
+  memoryCount.textContent = `${memories.length} photo signals`;
   activeDate.textContent = memories.length
     ? formatDate(memories[activeIndex].date)
-    : "대기 중";
+    : "Standby";
 }
 
 function renderCurrentMemory() {
   if (!memories.length) {
     currentMemory.innerHTML = `
       <p class="eyebrow">Current Signal</p>
-      <h2>가까운 사진 신호가 없습니다.</h2>
-      <p>사진을 향해 이동하면 이곳에 현재 바라보는 기억이 표시됩니다.</p>
+      <h2>No nearby photo signal.</h2>
+      <p>Fly toward a photo to see the memory you are facing here.</p>
     `;
     return;
   }
@@ -806,7 +923,7 @@ function renderCurrentMemory() {
       <span>${activeIndex + 1} / ${memories.length}</span>
     </div>
     <h2>${escapeHtml(memory.caption)}</h2>
-    <p>WASD 이동 · 마우스 드래그 시점 회전 · 휠 전진/후진 · 더블클릭 워프</p>
+    <p>WASD move · mouse drag to look · wheel forward/back · double-click to warp</p>
   `;
 }
 
@@ -935,8 +1052,8 @@ function updatePhotoPreview(file = photoInput.files[0]) {
   if (!file) {
     dropZone.classList.remove("has-preview");
     photoPreview.style.backgroundImage = "";
-    fileName.textContent = "사진 선택 또는 드래그";
-    setPhotoDateHint("사진 정보에 촬영일이 있으면 자동 입력됩니다.");
+    fileName.textContent = "Choose or drag a photo";
+    setPhotoDateHint("If the photo includes a capture date, it will be filled automatically.");
     return;
   }
 
@@ -953,27 +1070,27 @@ async function updateDateFromPhoto(file) {
 
   if (!file) return;
 
-  setPhotoDateHint("사진 촬영일을 확인하는 중입니다.");
+  setPhotoDateHint("Checking the photo capture date.");
 
   try {
     const takenDate = await extractImageTakenDate(file);
     if (photoToken !== selectedPhotoToken) return;
 
     if (!takenDate) {
-      setPhotoDateHint("촬영일 정보가 없어서 현재 날짜를 유지합니다.");
+      setPhotoDateHint("No capture date found, so the current date is kept.");
       return;
     }
 
     if (dateWasManuallyEdited) {
-      setPhotoDateHint("촬영일을 찾았지만 직접 설정한 날짜를 유지합니다.");
+      setPhotoDateHint("A capture date was found, but your manually selected date is kept.");
       return;
     }
 
     dateInput.value = takenDate;
-    setPhotoDateHint("사진 촬영일로 날짜를 자동 설정했습니다. 원하면 직접 바꿀 수 있습니다.");
+    setPhotoDateHint("The date was set from the photo capture date. You can still change it.");
   } catch {
     if (photoToken === selectedPhotoToken) {
-      setPhotoDateHint("촬영일을 읽지 못해 현재 날짜를 유지합니다.");
+      setPhotoDateHint("Could not read the capture date, so the current date is kept.");
     }
   }
 }
@@ -989,10 +1106,10 @@ function resetUploadForm() {
 
   dropZone.classList.remove("has-preview");
   photoPreview.style.backgroundImage = "";
-  fileName.textContent = "사진 선택 또는 드래그";
+  fileName.textContent = "Choose or drag a photo";
   dateWasManuallyEdited = false;
   selectedPhotoToken += 1;
-  setPhotoDateHint("사진 정보에 촬영일이 있으면 자동 입력됩니다.");
+  setPhotoDateHint("If the photo includes a capture date, it will be filled automatically.");
 }
 
 function loadMemories(rawValue = localStorage.getItem(storageKey)) {
@@ -1002,9 +1119,9 @@ function loadMemories(rawValue = localStorage.getItem(storageKey)) {
       .filter((item) => item.imageData && item.date)
       .map((item) => ({
         id: item.id || createId(),
-        owner: item.owner || "우리",
+        owner: item.owner || "Us",
         date: item.date,
-        caption: item.caption || "오래 기억될 순간",
+        caption: item.caption || "A moment worth remembering",
         imageData: item.imageData,
         isTestMemory: Boolean(item.isTestMemory),
       }));
@@ -1017,7 +1134,7 @@ function saveMemories() {
   try {
     localStorage.setItem(storageKey, JSON.stringify(memories));
   } catch {
-    window.alert("브라우저 저장 공간이 부족해서 일부 사진을 저장하지 못했습니다.");
+    window.alert("Browser storage is full, so some photos could not be saved.");
   }
 }
 
@@ -1170,9 +1287,9 @@ function createTestMemories(count) {
 
     return {
       id: createId(),
-      owner: ["최호석", "정혜준"][index % 2],
+      owner: ["Choi Ho-seok", "Jung Hye-jun"][index % 2],
       date: toDateInputValue(date),
-      caption: `테스트 별자리 ${String(index + 1).padStart(3, "0")}`,
+      caption: `Sample constellation ${String(index + 1).padStart(3, "0")}`,
       imageData: createTestImage(index),
       isTestMemory: true,
     };
@@ -1220,7 +1337,7 @@ function compareByDate(a, b) {
 }
 
 function formatDate(value) {
-  return new Intl.DateTimeFormat("ko-KR", {
+  return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -1228,7 +1345,7 @@ function formatDate(value) {
 }
 
 function formatShortDate(value) {
-  return new Intl.DateTimeFormat("ko-KR", {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
@@ -1311,5 +1428,5 @@ function createId() {
 
 function stopAutoTour() {
   autoTour = false;
-  playButton.textContent = "자동 순항";
+  playButton.textContent = "Auto cruise";
 }

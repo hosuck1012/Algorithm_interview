@@ -518,7 +518,7 @@ input[type="range"] {
 }
 
 .timeline:empty::before {
-  content: "아직 기록된 사진이 없습니다.";
+  content: "No photos have been recorded yet.";
   border: 1px dashed rgba(220, 238, 255, 0.2);
   border-radius: 8px;
   padding: 12px;

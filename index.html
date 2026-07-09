@@ -8,7 +8,7 @@
   </head>
   <body>
     <main class="ship-app">
-      <section class="space-viewport" id="spaceViewport" tabindex="0" aria-label="우주선 시점 사진 별자리">
+      <section class="space-viewport" id="spaceViewport" tabindex="0" aria-label="Spaceship-view photo constellation">
         <canvas id="starCanvas" aria-hidden="true"></canvas>
         <canvas id="constellationCanvas" aria-hidden="true"></canvas>
         <div class="memory-space" id="memorySpace"></div>
@@ -23,16 +23,16 @@
             <p class="eyebrow">Our Orbit</p>
           </div>
           <div class="flight-stats" aria-live="polite">
-            <span id="memoryCount">0개의 순간</span>
-            <span id="activeDate">대기 중</span>
+            <span id="memoryCount">0 memories</span>
+            <span id="activeDate">Standby</span>
             <span id="shipPosition">X 0 · Y 0 · Z 0</span>
           </div>
         </header>
 
-        <aside class="control-dock" aria-label="사진 업로드와 항해 조작">
+        <aside class="control-dock" aria-label="Photo upload and flight controls">
           <div class="dock-copy">
             <p class="eyebrow">Flight Deck</p>
-            <p>WASD로 이동, 마우스 드래그로 시점 회전, 휠로 전진/후진합니다.</p>
+            <p>Move with WASD, drag the mouse to rotate, and use the wheel to move forward or backward.</p>
           </div>
 
           <form class="upload-panel" id="uploadForm">
@@ -40,68 +40,68 @@
               <input id="photoInput" type="file" accept="image/*" required />
               <span class="drop-zone__preview" id="photoPreview"></span>
               <span class="drop-zone__icon">+</span>
-              <span class="drop-zone__text" id="fileName">사진 선택 또는 드래그</span>
+              <span class="drop-zone__text" id="fileName">Choose or drag a photo</span>
             </label>
 
             <div class="field-grid">
               <label>
-                기록한 사람
+                Person
                 <select id="ownerInput" required>
-                  <option value="최호석">최호석</option>
-                  <option value="정혜준">정혜준</option>
+                  <option value="Choi Ho-seok">Choi Ho-seok</option>
+                  <option value="Jung Hye-jun">Jung Hye-jun</option>
                 </select>
               </label>
               <label>
-                날짜
+                Date
                 <input id="dateInput" type="date" required />
-                <small class="field-hint" id="photoDateHint">사진 정보에 촬영일이 있으면 자동 입력됩니다.</small>
+                <small class="field-hint" id="photoDateHint">If the photo includes a capture date, it will be filled automatically.</small>
               </label>
             </div>
 
             <label>
-              한 줄 기억
+              Memory caption
               <input
                 id="captionInput"
                 type="text"
                 maxlength="60"
-                placeholder="예: 처음 같이 별을 보던 밤"
+                placeholder="Example: The night we first watched the stars together"
               />
             </label>
 
-            <button type="submit">우주에 사진 띄우기</button>
+            <button type="submit">Launch photo into space</button>
           </form>
 
           <div class="navigation-bar">
             <label class="time-control">
-              <span>시간 워프</span>
+              <span>Time warp</span>
               <input id="timeSlider" type="range" min="0" max="0" value="0" />
             </label>
             <div class="button-grid">
-              <button id="playButton" type="button">자동 순항</button>
-              <button id="seedButton" type="button">테스트 100개</button>
-              <button id="clearButton" type="button">전체 삭제</button>
+              <button id="playButton" type="button">Auto cruise</button>
+              <button id="seedButton" type="button">100 samples</button>
+              <button id="clearButton" type="button">Delete all</button>
             </div>
           </div>
         </aside>
 
         <article class="current-memory" id="currentMemory" aria-live="polite">
           <p class="eyebrow">Current Signal</p>
-          <h2>가까운 사진 신호가 없습니다.</h2>
-          <p>사진을 향해 이동하면 이곳에 현재 바라보는 기억이 표시됩니다.</p>
+          <h2>No nearby photo signal.</h2>
+          <p>Fly toward a photo to see the memory you are facing here.</p>
         </article>
 
-        <section class="mission-log" aria-label="날짜순 사진 목록">
+        <section class="mission-log" aria-label="Chronological photo list">
           <div class="mission-log__header">
             <p class="eyebrow">Constellation Log</p>
-            <h2>날짜순 좌표</h2>
+            <h2>Chronological coordinates</h2>
           </div>
           <div class="timeline" id="timeline"></div>
         </section>
 
         <div class="empty-state" id="emptyState">
           <p class="eyebrow">No Signal</p>
-          <h2>사진을 올리면 우주 공간에 첫 좌표가 생깁니다.</h2>
-          <p>초기 테스트용 사진 100개는 자동으로 준비되어 있습니다.</p>
+          <h2>Upload a photo to create the first coordinate in space.</h2>
+          <p>100 sample photos are ready for initial testing.</p>
         </div>
 
         <div class="cockpit" aria-hidden="true">
@@ -133,7 +133,7 @@
             <em></em>
           </span>
         </button>
-        <button class="log-row__delete" type="button" aria-label="사진 삭제">삭제</button>
+        <button class="log-row__delete" type="button" aria-label="Delete photo">Delete</button>
       </article>
     </template>
 
