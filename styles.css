@@ -113,6 +113,20 @@ body.is-locked .ship-app {
   pointer-events: none;
 }
 
+.space-viewport::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, rgba(0, 1, 6, 0.8), rgba(0, 1, 6, 0.28) 44%, rgba(0, 1, 6, 0.72)),
+    linear-gradient(180deg, rgba(0, 1, 6, 0.38), rgba(0, 1, 6, 0.12) 46%, rgba(0, 1, 6, 0.58)),
+    url("reference/85841_thumb.webp") center / cover no-repeat;
+  filter: contrast(1.16) saturate(1.08);
+  opacity: 0.46;
+  pointer-events: none;
+}
+
 .space-viewport.is-dragging {
   cursor: grabbing;
 }
@@ -211,12 +225,15 @@ body.is-locked .ship-app {
 }
 
 .logout-button {
+  position: relative;
+  z-index: 2;
   padding: 7px 12px;
   border: 1px solid rgba(220, 238, 255, 0.18);
   background: rgba(255, 255, 255, 0.07);
   color: var(--ink);
   font-size: 0.82rem;
   font-weight: 900;
+  pointer-events: auto;
 }
 
 #starCanvas,
@@ -394,6 +411,7 @@ p {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+  pointer-events: auto;
 }
 
 .flight-stats span {

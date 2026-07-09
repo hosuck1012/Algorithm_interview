@@ -117,12 +117,10 @@ function bindEvents() {
     spaceViewport.focus({ preventScroll: true });
   });
 
-  logoutButton.addEventListener("click", () => {
-    sessionStorage.removeItem(authStorageKey);
-    stopAutoTour();
-    applyAuthState();
-    loginUser.focus();
+  logoutButton.addEventListener("pointerdown", (event) => {
+    event.stopPropagation();
   });
+  logoutButton.addEventListener("click", handleLogout);
 
   uploadForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -290,6 +288,14 @@ function applyAuthState() {
   }
 }
 
+function handleLogout(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  sessionStorage.removeItem(authStorageKey);
+  stopAutoTour();
+  applyAuthState();
+}
+
 function renderData({ warpToActive = false } = {}) {
   memories = memories.sort(compareByDate);
   activeIndex = clamp(activeIndex, 0, Math.max(memories.length - 1, 0));
@@ -298,7 +304,6 @@ function renderData({ warpToActive = false } = {}) {
 
   assignWorldPositions();
   assignSolarSystems();
-  assignDeepSpaceObjects();
   renderMemoryNodes();
   renderTimeline();
   emptyState.classList.toggle("is-hidden", memories.length > 0);
@@ -535,7 +540,6 @@ function drawScene() {
   drawStarfield();
   projectedMemories = memories.map((memory) => projectWorld(memory.world));
   updateActiveFromView();
-  drawDeepSpaceObjects();
   drawConstellationLines();
   drawSolarSystems();
   updateMemoryNodePositions();
@@ -867,8 +871,8 @@ function drawSolarSystems() {
     const point = projectWorld(system);
     if (!point.visible || !isNearScreen(point, 520) || point.depth > 16000) return;
 
-    const scale = clamp(point.scale * 3.5, 0.72, 3.35);
-    const sunRadius = clamp(system.sunRadius * scale, 86, 260);
+    const scale = clamp(point.scale * 4.1, 0.26, 3.35);
+    const sunRadius = clamp(system.sunRadius * scale, 42, 260);
     const sunGradient = lineContext.createRadialGradient(
       point.x - sunRadius * 0.28,
       point.y - sunRadius * 0.28,
@@ -891,8 +895,8 @@ function drawSolarSystems() {
       const orbitX = planet.orbit * scale;
       const orbitY = orbitX * 0.42;
       lineContext.shadowBlur = 0;
-      lineContext.strokeStyle = "rgba(185, 231, 255, 0.17)";
-      lineContext.lineWidth = Math.max(0.8, scale * 1.2);
+      lineContext.strokeStyle = "rgba(185, 231, 255, 0.1)";
+      lineContext.lineWidth = Math.max(0.6, scale * 0.9);
       lineContext.beginPath();
       lineContext.ellipse(point.x, point.y, orbitX, orbitY, 0, 0, Math.PI * 2);
       lineContext.stroke();
@@ -900,7 +904,7 @@ function drawSolarSystems() {
 
     lineContext.fillStyle = "rgba(255, 221, 111, 0.98)";
     lineContext.shadowColor = "rgba(255, 198, 74, 0.78)";
-    lineContext.shadowBlur = 26;
+    lineContext.shadowBlur = Math.max(12, sunRadius * 0.32);
     lineContext.beginPath();
     lineContext.arc(point.x, point.y, sunRadius, 0, Math.PI * 2);
     lineContext.fill();
