@@ -1,5 +1,9 @@
 ﻿const storageKey = "our-time-gallery:v1";
 
+const databaseName = "our-time-gallery-db";
+const databaseVersion = 1;
+const imageStoreName = "memoryImages";
+
 const authStorageKey = "our-time-gallery:auth";
 const allowedLogin = {
   id: "0826",
@@ -38,8 +42,7 @@ const timeline = document.querySelector("#timeline");
 const nodeTemplate = document.querySelector("#memoryNodeTemplate");
 const timelineTemplate = document.querySelector("#timelineItemTemplate");
 
-const storedMemories = localStorage.getItem(storageKey);
-let memories = storedMemories === null ? createTestMemories(100) : loadMemories(storedMemories);
+let memories = [];
 let activeIndex = 0;
 let playTimer = null;
 let previewUrl = null;
@@ -48,6 +51,7 @@ let selectedPhotoToken = 0;
 let autoTour = false;
 let tourIndex = 0;
 let lastFrameTime = 0;
+let shouldRewriteStorage = false;
 
 const scene = {
   width: 0,
@@ -81,19 +85,27 @@ const lineContext = constellationCanvas.getContext("2d");
 let memoryNodes = [];
 let logRows = [];
 let projectedMemories = [];
+const photoDateCache = new WeakMap();
 
-applyAuthState();
-dateInput.valueAsDate = new Date();
-setupCanvases();
-createStars();
-bindEvents();
-renderData({ warpToActive: true });
+initializeApp();
 
-if (storedMemories === null) {
-  saveMemories();
+async function initializeApp() {
+  applyAuthState();
+  dateInput.valueAsDate = new Date();
+  setupCanvases();
+  createStars();
+  bindEvents();
+
+  const storedMemories = await loadMemories();
+  memories = storedMemories ?? createTestMemories(100);
+  renderData({ warpToActive: true });
+
+  if (storedMemories === null || shouldRewriteStorage) {
+    await saveMemories();
+  }
+
+  window.requestAnimationFrame(renderFrame);
 }
-
-window.requestAnimationFrame(renderFrame);
 
 function bindEvents() {
   loginForm.addEventListener("submit", (event) => {
@@ -125,24 +137,43 @@ function bindEvents() {
   uploadForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const file = photoInput.files[0];
-    if (!file) return;
+    const files = getSelectedImageFiles();
+    if (!files.length) return;
 
-    const imageData = await readImage(file);
-    const memory = {
-      id: createId(),
-      owner: ownerInput.value,
-      date: dateInput.value,
-      caption: captionInput.value.trim() || "A moment worth remembering",
-      imageData,
-      isTestMemory: false,
-    };
+    const uploadButton = uploadForm.querySelector("button[type='submit']");
+    const originalButtonText = uploadButton.textContent;
+    uploadButton.disabled = true;
+    uploadButton.textContent = files.length === 1 ? "Launching photo..." : `Launching ${files.length} photos...`;
 
-    memories = [...memories, memory].sort(compareByDate);
-    activeIndex = memories.findIndex((item) => item.id === memory.id);
-    resetUploadForm();
-    saveMemories();
-    renderData({ warpToActive: true });
+    try {
+      const fallbackDate = dateInput.value || toDateInputValue(new Date());
+      const useManualDate = dateWasManuallyEdited;
+      const createdMemories = [];
+
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        const imageData = await readImage(file);
+        const capturedDate = useManualDate ? null : await getPhotoTakenDate(file);
+
+        createdMemories.push({
+          id: createId(),
+          owner: ownerInput.value,
+          date: useManualDate ? fallbackDate : capturedDate || fallbackDate,
+          caption: createUploadedCaption(file),
+          imageData,
+          isTestMemory: false,
+        });
+      }
+
+      memories = [...memories, ...createdMemories].sort(compareByDate);
+      activeIndex = memories.findIndex((item) => item.id === createdMemories[0].id);
+      resetUploadForm();
+      await saveMemories();
+      renderData({ warpToActive: true });
+    } finally {
+      uploadButton.disabled = false;
+      uploadButton.textContent = originalButtonText;
+    }
   });
 
   photoInput.addEventListener("change", handlePhotoSelection);
@@ -165,13 +196,13 @@ function bindEvents() {
     event.preventDefault();
     dropZone.classList.remove("is-dragging");
 
-    const file = [...event.dataTransfer.files].find((item) =>
+    const files = [...event.dataTransfer.files].filter((item) =>
       item.type.startsWith("image/")
     );
-    if (!file) return;
+    if (!files.length) return;
 
     const transfer = new DataTransfer();
-    transfer.items.add(file);
+    files.forEach((file) => transfer.items.add(file));
     photoInput.files = transfer.files;
     handlePhotoSelection();
   });
@@ -194,7 +225,7 @@ function bindEvents() {
     playButton.textContent = "Stop cruise";
   });
 
-  seedButton.addEventListener("click", () => {
+  seedButton.addEventListener("click", async () => {
     stopAutoTour();
     const generatedMemories = createTestMemories(100);
     memories = [
@@ -202,22 +233,28 @@ function bindEvents() {
       ...generatedMemories,
     ].sort(compareByDate);
     activeIndex = memories.findIndex((memory) => memory.id === generatedMemories[0].id);
-    saveMemories();
+    await saveMemories();
     renderData({ warpToActive: true });
   });
 
-  clearButton.addEventListener("click", () => {
-    if (!memories.length) return;
+  clearButton.addEventListener("click", async () => {
+    const sampleCount = memories.filter((memory) => memory.isTestMemory).length;
+    if (!sampleCount) {
+      window.alert("There are no sample photos to delete.");
+      return;
+    }
 
     const confirmed = window.confirm(
-      "Delete all uploaded and sample photos from this browser?"
+      `Delete ${sampleCount} sample photos from this browser? Your uploaded photos will stay.`
     );
     if (!confirmed) return;
 
-    memories = [];
-    activeIndex = 0;
+    const activeMemoryId = memories[activeIndex]?.id;
+    memories = memories.filter((memory) => !memory.isTestMemory);
+    activeIndex = Math.max(memories.findIndex((memory) => memory.id === activeMemoryId), 0);
+    activeIndex = clamp(activeIndex, 0, Math.max(memories.length - 1, 0));
     stopAutoTour();
-    saveMemories();
+    await saveMemories();
     renderData();
   });
 
@@ -435,10 +472,13 @@ function renderTimeline() {
       setActiveIndex(index, { warp: true });
     });
 
-    deleteButton.addEventListener("click", () => {
+    deleteButton.addEventListener("click", async () => {
       memories = memories.filter((item) => item.id !== memory.id);
       activeIndex = clamp(activeIndex, 0, Math.max(memories.length - 1, 0));
-      saveMemories();
+      if (!memory.isTestMemory) {
+        await deleteMemoryImages([memory.id]);
+      }
+      await saveMemories();
       renderData({ warpToActive: true });
     });
 
@@ -563,7 +603,7 @@ function drawStarfield() {
     const projected = projectWorld(star);
     if (!projected.visible) return;
 
-    const radius = clamp(projected.scale * star.size * 1.55, 0.22, star.bright ? 3.6 : 1.7);
+    const radius = clamp(projected.scale * star.size * 1.55, 0.28, star.bright ? 3.6 : 1.8);
     const alpha = clamp(star.alpha * (1 - projected.depth / 62000), 0.08, star.bright ? 0.98 : 0.72);
 
     starContext.beginPath();
@@ -1005,6 +1045,11 @@ function drawConstellationLines() {
 function updateMemoryNodePositions() {
   memoryNodes.forEach((node, index) => {
     const projected = projectedMemories[index];
+    if (!projected) {
+      node.classList.add("is-hidden");
+      return;
+    }
+
     const hidden = !projected.visible || !isNearScreen(projected, 320) || projected.depth > 11000;
 
     node.classList.toggle("is-hidden", hidden);
@@ -1196,62 +1241,63 @@ function createStars() {
     "#ffffff",
     "#ffffff",
     "#dbe9ff",
-    "#9fc8ff",
-    "#ffe4a8",
-    "#ffbe7a",
+    "#b8d2ff",
+    "#f7ddb2",
+    "#d8c5a3",
   ];
 
-  for (let index = 0; index < 1280; index += 1) {
-    const bright = index % 71 === 0;
+  for (let index = 0; index < 3200; index += 1) {
+    const bright = index % 113 === 0;
     stars.push({
-      x: Math.random() * 26000 - 13000,
-      y: Math.random() * 15000 - 7500,
-      z: -Math.random() * 72000 - 1800,
-      size: bright ? Math.random() * 3.2 + 3.2 : Math.random() * 1.8 + 0.35,
-      alpha: bright ? Math.random() * 0.24 + 0.74 : Math.random() * 0.46 + 0.22,
+      x: Math.random() * 56000 - 28000,
+      y: Math.random() * 32000 - 16000,
+      z: Math.random() * 152000 - 98000,
+      size: bright ? Math.random() * 2.6 + 2.6 : Math.random() * 1.55 + 0.28,
+      alpha: bright ? Math.random() * 0.2 + 0.68 : Math.random() * 0.4 + 0.2,
       bright,
       color: starPalette[Math.floor(Math.random() * starPalette.length)],
     });
   }
 
   fieldGlows.push(
-    { x: -1700, y: -650, z: -25000, radius: 10800, color: "91, 156, 240", core: "245, 249, 255", alpha: 0.085 },
-    { x: 1600, y: 200, z: -27000, radius: 8600, color: "116, 201, 255", core: "235, 244, 255", alpha: 0.055 },
-    { x: -900, y: 950, z: -33000, radius: 7400, color: "255, 190, 117", core: "255, 239, 210", alpha: 0.035 }
+    { x: -4200, y: -1300, z: -21000, radius: 8200, color: "94, 143, 211", core: "220, 232, 255", alpha: 0.065 },
+    { x: 3600, y: 900, z: -27500, radius: 7000, color: "112, 169, 218", core: "236, 242, 255", alpha: 0.045 },
+    { x: 11400, y: -5400, z: -36000, radius: 9600, color: "215, 164, 103", core: "255, 232, 190", alpha: 0.036 },
+    { x: -16800, y: 7200, z: 18000, radius: 10400, color: "80, 118, 180", core: "214, 229, 255", alpha: 0.04 },
+    { x: 6200, y: -8200, z: 25000, radius: 7600, color: "198, 180, 145", core: "255, 244, 218", alpha: 0.028 }
   );
 
   const galaxyPalette = [
-    { color: "143, 178, 255", core: "248, 250, 255" },
-    { color: "255, 205, 132", core: "255, 246, 218" },
-    { color: "179, 226, 255", core: "242, 248, 255" },
-    { color: "255, 169, 113", core: "255, 232, 202" },
-    { color: "206, 214, 255", core: "255, 255, 255" },
+    { color: "128, 158, 214", core: "234, 239, 248" },
+    { color: "205, 166, 108", core: "250, 232, 200" },
+    { color: "156, 190, 218", core: "238, 244, 250" },
+    { color: "184, 137, 104", core: "248, 221, 196" },
+    { color: "177, 184, 216", core: "248, 249, 255" },
   ];
 
-  for (let index = 0; index < 132; index += 1) {
+  for (let index = 0; index < 380; index += 1) {
     const palette = galaxyPalette[index % galaxyPalette.length];
-    const major = Math.random() * 880 + 180;
-    const compact = index % 5 === 0;
+    const major = Math.random() * 1180 + 160;
+    const compact = index % 6 === 0;
 
     distantGalaxies.push({
-      x: Math.random() * 32000 - 16000,
-      y: Math.random() * 18000 - 9000,
-      z: -Math.random() * 62000 - 9000,
-      major: compact ? major * 0.42 : major,
-      minor: major * (compact ? 0.18 : Math.random() * 0.18 + 0.08),
+      x: Math.random() * 64000 - 32000,
+      y: Math.random() * 36000 - 18000,
+      z: Math.random() * 148000 - 94000,
+      major: compact ? major * 0.36 : major,
+      minor: major * (compact ? 0.12 : Math.random() * 0.14 + 0.045),
       rotation: Math.random() * Math.PI,
-      alpha: compact ? Math.random() * 0.22 + 0.16 : Math.random() * 0.28 + 0.18,
+      alpha: compact ? Math.random() * 0.16 + 0.1 : Math.random() * 0.2 + 0.11,
       color: palette.color,
       core: palette.core,
-      hasCore: index % 4 !== 0,
+      hasCore: index % 3 !== 0,
     });
   }
 
   lensFlares.push(
-    { x: 9500, y: 6100, z: -24000, size: 430, color: "#ffe08a", alpha: 0.86 },
-    { x: 900, y: 1200, z: -23000, size: 300, color: "#dcecff", alpha: 0.72 },
-    { x: -8600, y: -5000, z: -30000, size: 260, color: "#ffd19a", alpha: 0.58 },
-    { x: 7600, y: -4800, z: -42000, size: 240, color: "#b9d8ff", alpha: 0.5 }
+    { x: 14200, y: 7800, z: -26000, size: 280, color: "#f3d08c", alpha: 0.42 },
+    { x: -9200, y: -5100, z: 12000, size: 220, color: "#dbe9ff", alpha: 0.34 },
+    { x: 11800, y: -6800, z: 32000, size: 180, color: "#d2ddf0", alpha: 0.28 }
   );
 }
 
@@ -1267,56 +1313,67 @@ function endLook(event) {
 }
 
 function handlePhotoSelection() {
-  const file = photoInput.files[0];
-  updatePhotoPreview(file);
-  updateDateFromPhoto(file);
+  const files = getSelectedImageFiles();
+  updatePhotoPreview(files);
+  updateDateFromPhotos(files);
 }
 
-function updatePhotoPreview(file = photoInput.files[0]) {
+function getSelectedImageFiles() {
+  return [...photoInput.files].filter((file) => file.type.startsWith("image/"));
+}
+
+function updatePhotoPreview(files = getSelectedImageFiles()) {
   if (previewUrl) {
     URL.revokeObjectURL(previewUrl);
     previewUrl = null;
   }
 
-  if (!file) {
+  if (!files.length) {
     dropZone.classList.remove("has-preview");
     photoPreview.style.backgroundImage = "";
-    fileName.textContent = "Choose or drag a photo";
+    fileName.textContent = "Choose or drag photos";
     setPhotoDateHint("If the photo includes a capture date, it will be filled automatically.");
     return;
   }
 
+  const [file] = files;
   previewUrl = URL.createObjectURL(file);
   dropZone.classList.add("has-preview");
   photoPreview.style.backgroundImage = `url("${previewUrl}")`;
-  fileName.textContent = file.name;
+  fileName.textContent = files.length === 1 ? file.name : `${files.length} photos selected`;
 }
 
-async function updateDateFromPhoto(file) {
+async function updateDateFromPhotos(files) {
   selectedPhotoToken += 1;
   const photoToken = selectedPhotoToken;
   dateWasManuallyEdited = false;
 
-  if (!file) return;
+  if (!files.length) return;
 
-  setPhotoDateHint("Checking the photo capture date.");
+  setPhotoDateHint(files.length === 1 ? "Checking the photo capture date." : `Checking capture dates for ${files.length} photos.`);
 
   try {
-    const takenDate = await extractImageTakenDate(file);
+    let takenDate = null;
+    for (const file of files) {
+      takenDate = await getPhotoTakenDate(file);
+      if (takenDate || photoToken !== selectedPhotoToken) break;
+    }
     if (photoToken !== selectedPhotoToken) return;
 
     if (!takenDate) {
-      setPhotoDateHint("No capture date found, so the current date is kept.");
+      setPhotoDateHint("No capture dates found, so the current date will be used.");
       return;
     }
 
     if (dateWasManuallyEdited) {
-      setPhotoDateHint("A capture date was found, but your manually selected date is kept.");
+      setPhotoDateHint("A capture date was found, but your manually selected date will be used.");
       return;
     }
 
     dateInput.value = takenDate;
-    setPhotoDateHint("The date was set from the photo capture date. You can still change it.");
+    setPhotoDateHint(files.length === 1
+      ? "The date was set from the photo capture date. You can still change it."
+      : "Each photo will use its own capture date when available. Change this field to apply one date to all selected photos.");
   } catch {
     if (photoToken === selectedPhotoToken) {
       setPhotoDateHint("Could not read the capture date, so the current date is kept.");
@@ -1335,36 +1392,160 @@ function resetUploadForm() {
 
   dropZone.classList.remove("has-preview");
   photoPreview.style.backgroundImage = "";
-  fileName.textContent = "Choose or drag a photo";
+  fileName.textContent = "Choose or drag photos";
   dateWasManuallyEdited = false;
   selectedPhotoToken += 1;
   setPhotoDateHint("If the photo includes a capture date, it will be filled automatically.");
 }
 
-function loadMemories(rawValue = localStorage.getItem(storageKey)) {
+async function loadMemories(rawValue = localStorage.getItem(storageKey)) {
+  if (rawValue === null) return null;
+  shouldRewriteStorage = rawValue.includes('"imageData"');
+
   try {
     const saved = JSON.parse(rawValue) ?? [];
-    return saved
-      .filter((item) => item.imageData && item.date)
-      .map((item) => ({
-        id: item.id || createId(),
-        owner: item.owner || "Us",
-        date: item.date,
-        caption: item.caption || "A moment worth remembering",
-        imageData: item.imageData,
-        isTestMemory: Boolean(item.isTestMemory),
-      }));
+    const hydratedMemories = await Promise.all(
+      saved.map((item, index) => hydrateStoredMemory(item, index))
+    );
+
+    return hydratedMemories.filter(Boolean);
   } catch {
     return [];
   }
 }
 
-function saveMemories() {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(memories));
-  } catch {
-    window.alert("Browser storage is full, so some photos could not be saved.");
+async function hydrateStoredMemory(item, index) {
+  if (!item?.date) return null;
+
+  const id = item.id || createId();
+  const isTestMemory = Boolean(item.isTestMemory);
+  let imageData = item.imageData;
+
+  if (!imageData && isTestMemory) {
+    imageData = createTestImage(getSampleImageIndex(item, index));
   }
+
+  if (!imageData && !isTestMemory) {
+    imageData = await loadMemoryImage(id);
+  }
+
+  if (!imageData) return null;
+
+  return {
+    id,
+    owner: item.owner || "Us",
+    date: item.date,
+    caption: item.caption || "A moment worth remembering",
+    imageData,
+    isTestMemory,
+  };
+}
+
+function getSampleImageIndex(item, fallbackIndex) {
+  const match = /^sample-(\d+)$/.exec(item.id || "");
+  return match ? Number(match[1]) - 1 : fallbackIndex;
+}
+
+async function saveMemories() {
+  try {
+    await saveMemoryImages(memories.filter((memory) => !memory.isTestMemory));
+    localStorage.setItem(storageKey, JSON.stringify(memories.map(toStoredMemory)));
+  } catch {
+    window.alert("Browser storage failed, so some photos could not be saved.");
+  }
+}
+
+function toStoredMemory(memory) {
+  return {
+    id: memory.id,
+    owner: memory.owner,
+    date: memory.date,
+    caption: memory.caption,
+    isTestMemory: memory.isTestMemory,
+  };
+}
+
+function openGalleryDatabase() {
+  if (!window.indexedDB) {
+    return Promise.reject(new Error("IndexedDB is not available."));
+  }
+
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(databaseName, databaseVersion);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(imageStoreName)) {
+        database.createObjectStore(imageStoreName, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveMemoryImages(imageMemories) {
+  if (!imageMemories.length) return;
+
+  const database = await openGalleryDatabase();
+  await runImageTransaction(database, "readwrite", (store) => {
+    imageMemories.forEach((memory) => {
+      store.put({ id: memory.id, imageData: memory.imageData });
+    });
+  });
+}
+
+async function loadMemoryImage(id) {
+  try {
+    const database = await openGalleryDatabase();
+
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(imageStoreName, "readonly");
+      const store = transaction.objectStore(imageStoreName);
+      const request = store.get(id);
+
+      request.onsuccess = () => resolve(request.result?.imageData || null);
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => database.close();
+      transaction.onerror = () => {
+        database.close();
+        reject(transaction.error);
+      };
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function deleteMemoryImages(ids) {
+  if (!ids.length) return;
+
+  const database = await openGalleryDatabase();
+  await runImageTransaction(database, "readwrite", (store) => {
+    ids.forEach((id) => store.delete(id));
+  });
+}
+
+function runImageTransaction(database, mode, callback) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(imageStoreName, mode);
+    const store = transaction.objectStore(imageStoreName);
+
+    callback(store);
+
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error);
+    };
+    transaction.onabort = () => {
+      database.close();
+      reject(transaction.error);
+    };
+  });
 }
 
 function setPhotoDateHint(message) {
@@ -1559,6 +1740,30 @@ function readImage(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+async function getPhotoTakenDate(file) {
+  if (photoDateCache.has(file)) {
+    return await photoDateCache.get(file);
+  }
+
+  const datePromise = extractImageTakenDate(file).catch(() => null);
+  photoDateCache.set(file, datePromise);
+  const date = await datePromise;
+  photoDateCache.set(file, date);
+  return date;
+}
+
+function createUploadedCaption(file) {
+  const caption = captionInput.value.trim();
+  if (caption) return caption;
+
+  const fileNameWithoutExtension = (file.name || "")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .trim();
+
+  return fileNameWithoutExtension || "A moment worth remembering";
 }
 
 function compareByDate(a, b) {

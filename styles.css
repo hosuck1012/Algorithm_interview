@@ -58,6 +58,12 @@ button:hover {
   transform: translateY(-1px);
 }
 
+button:disabled {
+  cursor: wait;
+  filter: grayscale(0.45) brightness(0.82);
+  transform: none;
+}
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -101,29 +107,11 @@ body.is-locked .ship-app {
 .space-viewport::before {
   content: "";
   position: absolute;
-  inset: -8%;
-  z-index: 0;
-  background:
-    radial-gradient(circle at 46% 46%, rgba(205, 226, 255, 0.07), transparent 3%),
-    radial-gradient(circle at 52% 52%, rgba(82, 151, 245, 0.055), transparent 17%),
-    radial-gradient(circle at 76% 68%, rgba(255, 190, 112, 0.032), transparent 15%);
-  filter: blur(24px);
-  mix-blend-mode: screen;
-  opacity: 0.42;
-  pointer-events: none;
-}
-
-.space-viewport::after {
-  content: "";
-  position: absolute;
   inset: 0;
   z-index: 0;
   background:
-    linear-gradient(90deg, rgba(0, 1, 6, 0.8), rgba(0, 1, 6, 0.28) 44%, rgba(0, 1, 6, 0.72)),
-    linear-gradient(180deg, rgba(0, 1, 6, 0.38), rgba(0, 1, 6, 0.12) 46%, rgba(0, 1, 6, 0.58)),
-    url("reference/85841_thumb.webp") center / cover no-repeat;
-  filter: contrast(1.16) saturate(1.08);
-  opacity: 0.46;
+    radial-gradient(ellipse at center, transparent 0 48%, rgba(0, 0, 0, 0.46) 100%),
+    linear-gradient(180deg, rgba(0, 1, 6, 0.08), rgba(0, 1, 6, 0.32));
   pointer-events: none;
 }
 
