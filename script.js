@@ -1,5 +1,17 @@
 ﻿const storageKey = "our-time-gallery:v1";
 
+const authStorageKey = "our-time-gallery:auth";
+const allowedLogin = {
+  id: "0826",
+  password: "486",
+};
+
+const loginGate = document.querySelector("#loginGate");
+const loginForm = document.querySelector("#loginForm");
+const loginUser = document.querySelector("#loginUser");
+const loginPassword = document.querySelector("#loginPassword");
+const loginError = document.querySelector("#loginError");
+const logoutButton = document.querySelector("#logoutButton");
 const starCanvas = document.querySelector("#starCanvas");
 const constellationCanvas = document.querySelector("#constellationCanvas");
 const uploadForm = document.querySelector("#uploadForm");
@@ -59,6 +71,9 @@ const pointer = {
 
 const keys = new Set();
 const stars = [];
+const distantGalaxies = [];
+const fieldGlows = [];
+const lensFlares = [];
 const solarSystems = [];
 const deepSpaceObjects = [];
 const starContext = starCanvas.getContext("2d");
@@ -67,6 +82,7 @@ let memoryNodes = [];
 let logRows = [];
 let projectedMemories = [];
 
+applyAuthState();
 dateInput.valueAsDate = new Date();
 setupCanvases();
 createStars();
@@ -80,6 +96,34 @@ if (storedMemories === null) {
 window.requestAnimationFrame(renderFrame);
 
 function bindEvents() {
+  loginForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const isAllowed =
+      loginUser.value.trim() === allowedLogin.id &&
+      loginPassword.value === allowedLogin.password;
+
+    if (!isAllowed) {
+      loginError.hidden = false;
+      loginPassword.value = "";
+      loginPassword.focus();
+      return;
+    }
+
+    sessionStorage.setItem(authStorageKey, "granted");
+    loginError.hidden = true;
+    loginPassword.value = "";
+    applyAuthState();
+    spaceViewport.focus({ preventScroll: true });
+  });
+
+  logoutButton.addEventListener("click", () => {
+    sessionStorage.removeItem(authStorageKey);
+    stopAutoTour();
+    applyAuthState();
+    loginUser.focus();
+  });
+
   uploadForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -231,6 +275,19 @@ function bindEvents() {
   });
 
   window.addEventListener("resize", setupCanvases);
+}
+
+function applyAuthState() {
+  const isAuthenticated = sessionStorage.getItem(authStorageKey) === "granted";
+
+  document.body.classList.toggle("is-locked", !isAuthenticated);
+  loginGate.hidden = isAuthenticated;
+  loginGate.setAttribute("aria-hidden", String(isAuthenticated));
+  spaceViewport.setAttribute("aria-hidden", String(!isAuthenticated));
+
+  if (!isAuthenticated) {
+    window.setTimeout(() => loginUser.focus(), 0);
+  }
 }
 
 function renderData({ warpToActive = false } = {}) {
@@ -492,21 +549,134 @@ function clearCanvases() {
 
 function drawStarfield() {
   starContext.save();
+  starContext.globalCompositeOperation = "screen";
+
+  drawFieldGlows();
+  drawDistantGalaxies();
+  drawLensFlares();
 
   stars.forEach((star) => {
     const projected = projectWorld(star);
     if (!projected.visible) return;
 
-    const radius = clamp(projected.scale * star.size * 1.2, 0.35, 2.4);
-    const alpha = clamp(1 - projected.depth / 52000, 0.08, 0.95);
+    const radius = clamp(projected.scale * star.size * 1.55, 0.22, star.bright ? 3.6 : 1.7);
+    const alpha = clamp(star.alpha * (1 - projected.depth / 62000), 0.08, star.bright ? 0.98 : 0.72);
 
     starContext.beginPath();
     starContext.fillStyle = star.color;
     starContext.globalAlpha = alpha;
     starContext.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
     starContext.fill();
+
+    if (star.bright && radius > 1.2) {
+      drawTinyStarFlare(projected.x, projected.y, radius, star.color, alpha);
+    }
   });
 
+  starContext.restore();
+}
+
+function drawFieldGlows() {
+  fieldGlows.forEach((glow) => {
+    const point = projectWorld(glow);
+    if (!point.visible || !isNearScreen(point, 900)) return;
+
+    const radius = clamp(glow.radius * point.scale, 180, 680);
+    const gradient = starContext.createRadialGradient(
+      point.x,
+      point.y,
+      0,
+      point.x,
+      point.y,
+      radius
+    );
+
+    gradient.addColorStop(0, `rgba(${glow.core}, ${glow.alpha})`);
+    gradient.addColorStop(0.22, `rgba(${glow.color}, ${glow.alpha * 0.7})`);
+    gradient.addColorStop(0.58, `rgba(${glow.color}, ${glow.alpha * 0.2})`);
+    gradient.addColorStop(1, `rgba(${glow.color}, 0)`);
+
+    starContext.fillStyle = gradient;
+    starContext.globalAlpha = 1;
+    starContext.beginPath();
+    starContext.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    starContext.fill();
+  });
+}
+
+function drawDistantGalaxies() {
+  distantGalaxies.forEach((galaxy) => {
+    const point = projectWorld(galaxy);
+    if (!point.visible || !isNearScreen(point, 160)) return;
+
+    const major = clamp(galaxy.major * point.scale, 2.2, 42);
+    const minor = clamp(galaxy.minor * point.scale, 0.8, 16);
+    const alpha = clamp(galaxy.alpha * (1 - point.depth / 72000), 0.04, galaxy.alpha);
+
+    starContext.save();
+    starContext.translate(point.x, point.y);
+    starContext.rotate(galaxy.rotation + camera.yaw * 0.08);
+
+    const halo = starContext.createRadialGradient(0, 0, 0, 0, 0, major);
+    halo.addColorStop(0, `rgba(${galaxy.core}, ${alpha})`);
+    halo.addColorStop(0.38, `rgba(${galaxy.color}, ${alpha * 0.42})`);
+    halo.addColorStop(1, `rgba(${galaxy.color}, 0)`);
+
+    starContext.fillStyle = halo;
+    starContext.globalAlpha = 1;
+    starContext.beginPath();
+    starContext.ellipse(0, 0, major, minor, 0, 0, Math.PI * 2);
+    starContext.fill();
+
+    if (galaxy.hasCore) {
+      starContext.fillStyle = `rgba(255, 246, 214, ${Math.min(alpha * 1.6, 0.74)})`;
+      starContext.beginPath();
+      starContext.ellipse(0, 0, major * 0.14, Math.max(0.6, minor * 0.28), 0, 0, Math.PI * 2);
+      starContext.fill();
+    }
+
+    starContext.restore();
+  });
+}
+
+function drawLensFlares() {
+  lensFlares.forEach((flare) => {
+    const point = projectWorld(flare);
+    if (!point.visible || !isNearScreen(point, 120)) return;
+
+    const radius = clamp(flare.size * point.scale, 3.6, 15);
+    const alpha = clamp(flare.alpha * (1 - point.depth / 62000), 0.18, 0.92);
+    drawTinyStarFlare(point.x, point.y, radius, flare.color, alpha);
+
+    const glow = starContext.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 8);
+    glow.addColorStop(0, hexToRgba(flare.color, alpha * 0.28));
+    glow.addColorStop(1, hexToRgba(flare.color, 0));
+    starContext.fillStyle = glow;
+    starContext.globalAlpha = 1;
+    starContext.beginPath();
+    starContext.arc(point.x, point.y, radius * 8, 0, Math.PI * 2);
+    starContext.fill();
+  });
+}
+
+function drawTinyStarFlare(x, y, radius, color, alpha) {
+  starContext.save();
+  starContext.strokeStyle = hexToRgba(color, alpha * 0.72);
+  starContext.lineWidth = Math.max(0.6, radius * 0.12);
+  starContext.shadowColor = color;
+  starContext.shadowBlur = radius * 2.5;
+
+  starContext.beginPath();
+  starContext.moveTo(x - radius * 7.2, y);
+  starContext.lineTo(x + radius * 7.2, y);
+  starContext.moveTo(x, y - radius * 4.8);
+  starContext.lineTo(x, y + radius * 4.8);
+  starContext.stroke();
+
+  starContext.fillStyle = hexToRgba(color, alpha);
+  starContext.beginPath();
+  starContext.arc(x, y, radius, 0, Math.PI * 2);
+  starContext.fill();
   starContext.restore();
 }
 
@@ -520,7 +690,7 @@ function drawDeepSpaceObjects() {
     const point = projectWorld(object);
     if (!point.visible || !isNearScreen(point, 620) || point.depth > 28000) return;
 
-    const scale = clamp(point.scale * 1.85, 0.22, 1.22);
+    const scale = clamp(point.scale * 1.35, 0.16, 0.86);
 
     if (object.type === "spiral") {
       drawSpiralGalaxy(object, point, scale);
@@ -541,8 +711,8 @@ function drawDeepSpaceObjects() {
 function drawSpiralGalaxy(object, point, scale) {
   const radius = clamp(object.radius * scale, 96, 320);
   const core = lineContext.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 0.78);
-  core.addColorStop(0, "rgba(255, 246, 210, 0.72)");
-  core.addColorStop(0.22, `rgba(${object.colorB}, 0.34)`);
+  core.addColorStop(0, "rgba(255, 246, 210, 0.46)");
+  core.addColorStop(0.22, `rgba(${object.colorB}, 0.22)`);
   core.addColorStop(1, `rgba(${object.colorA}, 0)`);
 
   lineContext.fillStyle = core;
@@ -566,10 +736,10 @@ function drawSpiralGalaxy(object, point, scale) {
       }
     }
 
-    lineContext.strokeStyle = `rgba(${arm === 1 ? object.colorB : object.colorA}, 0.34)`;
-    lineContext.lineWidth = Math.max(1.2, radius * 0.018);
-    lineContext.shadowColor = `rgba(${arm === 1 ? object.colorB : object.colorA}, 0.42)`;
-    lineContext.shadowBlur = 16;
+    lineContext.strokeStyle = `rgba(${arm === 1 ? object.colorB : object.colorA}, 0.2)`;
+    lineContext.lineWidth = Math.max(0.8, radius * 0.01);
+    lineContext.shadowColor = `rgba(${arm === 1 ? object.colorB : object.colorA}, 0.22)`;
+    lineContext.shadowBlur = 8;
     lineContext.stroke();
   }
 }
@@ -581,18 +751,18 @@ function drawBarredGalaxy(object, point, scale) {
   lineContext.rotate(object.rotation);
 
   const halo = lineContext.createRadialGradient(0, 0, 0, 0, 0, radius);
-  halo.addColorStop(0, "rgba(255, 240, 190, 0.5)");
-  halo.addColorStop(0.44, `rgba(${object.colorA}, 0.18)`);
+  halo.addColorStop(0, "rgba(255, 240, 190, 0.32)");
+  halo.addColorStop(0.44, `rgba(${object.colorA}, 0.12)`);
   halo.addColorStop(1, `rgba(${object.colorA}, 0)`);
   lineContext.fillStyle = halo;
   lineContext.beginPath();
   lineContext.ellipse(0, 0, radius, radius * 0.52, 0, 0, Math.PI * 2);
   lineContext.fill();
 
-  lineContext.strokeStyle = `rgba(${object.colorB}, 0.46)`;
-  lineContext.lineWidth = Math.max(3, radius * 0.045);
-  lineContext.shadowColor = `rgba(${object.colorB}, 0.42)`;
-  lineContext.shadowBlur = 18;
+  lineContext.strokeStyle = `rgba(${object.colorB}, 0.25)`;
+  lineContext.lineWidth = Math.max(1.4, radius * 0.026);
+  lineContext.shadowColor = `rgba(${object.colorB}, 0.22)`;
+  lineContext.shadowBlur = 9;
   lineContext.beginPath();
   lineContext.moveTo(-radius * 0.42, 0);
   lineContext.lineTo(radius * 0.42, 0);
@@ -602,8 +772,8 @@ function drawBarredGalaxy(object, point, scale) {
     lineContext.beginPath();
     lineContext.moveTo(side * radius * 0.16, 0);
     lineContext.bezierCurveTo(side * radius * 0.38, -radius * 0.34, side * radius * 0.68, -radius * 0.22, side * radius * 0.94, -radius * 0.06);
-    lineContext.strokeStyle = `rgba(${object.colorA}, 0.34)`;
-    lineContext.lineWidth = Math.max(1.4, radius * 0.018);
+    lineContext.strokeStyle = `rgba(${object.colorA}, 0.18)`;
+    lineContext.lineWidth = Math.max(0.8, radius * 0.012);
     lineContext.stroke();
   }
 
@@ -617,9 +787,9 @@ function drawEllipticalGalaxy(object, point, scale) {
   lineContext.rotate(object.rotation);
 
   const gradient = lineContext.createRadialGradient(0, 0, 0, 0, 0, radius);
-  gradient.addColorStop(0, "rgba(255, 255, 255, 0.48)");
-  gradient.addColorStop(0.24, `rgba(${object.colorA}, 0.24)`);
-  gradient.addColorStop(0.72, `rgba(${object.colorB}, 0.09)`);
+  gradient.addColorStop(0, "rgba(255, 255, 255, 0.3)");
+  gradient.addColorStop(0.24, `rgba(${object.colorA}, 0.16)`);
+  gradient.addColorStop(0.72, `rgba(${object.colorB}, 0.055)`);
   gradient.addColorStop(1, `rgba(${object.colorB}, 0)`);
   lineContext.fillStyle = gradient;
   lineContext.beginPath();
@@ -1014,16 +1184,71 @@ function setupCanvases() {
 
 function createStars() {
   stars.length = 0;
+  distantGalaxies.length = 0;
+  fieldGlows.length = 0;
+  lensFlares.length = 0;
 
-  for (let index = 0; index < 560; index += 1) {
+  const starPalette = [
+    "#ffffff",
+    "#ffffff",
+    "#dbe9ff",
+    "#9fc8ff",
+    "#ffe4a8",
+    "#ffbe7a",
+  ];
+
+  for (let index = 0; index < 1280; index += 1) {
+    const bright = index % 71 === 0;
     stars.push({
-      x: Math.random() * 16000 - 8000,
-      y: Math.random() * 9000 - 4500,
-      z: Math.random() * -62000 + 5000,
-      size: index % 53 === 0 ? Math.random() * 2.2 + 2.2 : Math.random() * 1.6 + 0.45,
-      color: ["#ffffff", "#7cf4ff", "#ffe08a", "#ffb5eb"][Math.floor(Math.random() * 4)],
+      x: Math.random() * 26000 - 13000,
+      y: Math.random() * 15000 - 7500,
+      z: -Math.random() * 72000 - 1800,
+      size: bright ? Math.random() * 3.2 + 3.2 : Math.random() * 1.8 + 0.35,
+      alpha: bright ? Math.random() * 0.24 + 0.74 : Math.random() * 0.46 + 0.22,
+      bright,
+      color: starPalette[Math.floor(Math.random() * starPalette.length)],
     });
   }
+
+  fieldGlows.push(
+    { x: -1700, y: -650, z: -25000, radius: 10800, color: "91, 156, 240", core: "245, 249, 255", alpha: 0.085 },
+    { x: 1600, y: 200, z: -27000, radius: 8600, color: "116, 201, 255", core: "235, 244, 255", alpha: 0.055 },
+    { x: -900, y: 950, z: -33000, radius: 7400, color: "255, 190, 117", core: "255, 239, 210", alpha: 0.035 }
+  );
+
+  const galaxyPalette = [
+    { color: "143, 178, 255", core: "248, 250, 255" },
+    { color: "255, 205, 132", core: "255, 246, 218" },
+    { color: "179, 226, 255", core: "242, 248, 255" },
+    { color: "255, 169, 113", core: "255, 232, 202" },
+    { color: "206, 214, 255", core: "255, 255, 255" },
+  ];
+
+  for (let index = 0; index < 132; index += 1) {
+    const palette = galaxyPalette[index % galaxyPalette.length];
+    const major = Math.random() * 880 + 180;
+    const compact = index % 5 === 0;
+
+    distantGalaxies.push({
+      x: Math.random() * 32000 - 16000,
+      y: Math.random() * 18000 - 9000,
+      z: -Math.random() * 62000 - 9000,
+      major: compact ? major * 0.42 : major,
+      minor: major * (compact ? 0.18 : Math.random() * 0.18 + 0.08),
+      rotation: Math.random() * Math.PI,
+      alpha: compact ? Math.random() * 0.22 + 0.16 : Math.random() * 0.28 + 0.18,
+      color: palette.color,
+      core: palette.core,
+      hasCore: index % 4 !== 0,
+    });
+  }
+
+  lensFlares.push(
+    { x: 9500, y: 6100, z: -24000, size: 430, color: "#ffe08a", alpha: 0.86 },
+    { x: 900, y: 1200, z: -23000, size: 300, color: "#dcecff", alpha: 0.72 },
+    { x: -8600, y: -5000, z: -30000, size: 260, color: "#ffd19a", alpha: 0.58 },
+    { x: 7600, y: -4800, z: -42000, size: 240, color: "#b9d8ff", alpha: 0.5 }
+  );
 }
 
 function endLook(event) {
@@ -1416,6 +1641,23 @@ function getDistance(from, to) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized = hex.replace("#", "");
+  const expanded =
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((value) => value + value)
+          .join("")
+      : normalized;
+  const value = Number.parseInt(expanded, 16);
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 function createId() {

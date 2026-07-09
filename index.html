@@ -1,12 +1,33 @@
 ﻿<!doctype html>
-<html lang="ko">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Our Orbit</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="is-locked">
+    <section class="login-gate" id="loginGate" aria-label="Private access login">
+      <div class="login-card">
+        <p class="eyebrow">Private Orbit</p>
+        <h1>Enter Our Orbit</h1>
+        <p class="login-card__copy">This photo constellation is reserved for two travelers.</p>
+
+        <form class="login-form" id="loginForm">
+          <label>
+            ID
+            <input id="loginUser" type="text" inputmode="numeric" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input id="loginPassword" type="password" inputmode="numeric" autocomplete="current-password" required />
+          </label>
+          <p class="login-error" id="loginError" hidden>Access denied. Check the ID and password.</p>
+          <button type="submit">Enter orbit</button>
+        </form>
+      </div>
+    </section>
+
     <main class="ship-app">
       <section class="space-viewport" id="spaceViewport" tabindex="0" aria-label="Spaceship-view photo constellation">
         <canvas id="starCanvas" aria-hidden="true"></canvas>
@@ -26,6 +47,7 @@
             <span id="memoryCount">0 memories</span>
             <span id="activeDate">Standby</span>
             <span id="shipPosition">X 0 · Y 0 · Z 0</span>
+            <button class="logout-button" id="logoutButton" type="button">Log out</button>
           </div>
         </header>
 
