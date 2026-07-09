@@ -59,7 +59,7 @@ const pointer = {
 
 const keys = new Set();
 const stars = [];
-const milkyWayDust = [];
+const solarSystems = [];
 const starContext = starCanvas.getContext("2d");
 const lineContext = constellationCanvas.getContext("2d");
 let memoryNodes = [];
@@ -69,7 +69,6 @@ let projectedMemories = [];
 dateInput.valueAsDate = new Date();
 setupCanvases();
 createStars();
-createMilkyWayDust();
 bindEvents();
 renderData({ warpToActive: true });
 
@@ -240,6 +239,7 @@ function renderData({ warpToActive = false } = {}) {
   timeSlider.value = String(activeIndex);
 
   assignWorldPositions();
+  assignSolarSystems();
   renderMemoryNodes();
   renderTimeline();
   emptyState.classList.toggle("is-hidden", memories.length > 0);
@@ -266,6 +266,31 @@ function assignWorldPositions() {
   });
 }
 
+function assignSolarSystems() {
+  solarSystems.length = 0;
+  if (memories.length < 3) return;
+
+  const step = clamp(Math.floor(memories.length / 9), 4, 12);
+
+  for (let index = 2; index < memories.length - 1; index += step) {
+    const before = memories[index - 1].world;
+    const after = memories[index].world;
+    const seed = index * 1.618;
+
+    solarSystems.push({
+      x: (before.x + after.x) / 2 + Math.sin(seed) * 340,
+      y: (before.y + after.y) / 2 + Math.cos(seed * 0.7) * 240,
+      z: (before.z + after.z) / 2,
+      sunRadius: 34 + (index % 3) * 7,
+      planets: [
+        { orbit: 74, radius: 6, angle: seed, color: "#8fe9ff" },
+        { orbit: 112, radius: 8, angle: seed + 1.8, color: "#ffd98b" },
+        { orbit: 153, radius: 5, angle: seed + 3.1, color: "#ff9ad8" },
+        { orbit: 196, radius: 7, angle: seed + 4.4, color: "#c7d6ff" },
+      ],
+    });
+  }
+}
 function renderMemoryNodes() {
   memorySpace.innerHTML = "";
   memoryNodes = [];
@@ -278,7 +303,7 @@ function renderMemoryNodes() {
 
     image.src = memory.imageData;
     image.alt = memory.caption;
-    date.textContent = `${formatShortDate(memory.date)} · ${memory.owner}`;
+    date.textContent = `${formatOrbitDate(memory.date)} · ${memory.owner}`;
     caption.textContent = memory.caption;
 
     node.addEventListener("click", (event) => {
@@ -435,6 +460,7 @@ function drawScene() {
   projectedMemories = memories.map((memory) => projectWorld(memory.world));
   updateActiveFromView();
   drawConstellationLines();
+  drawSolarSystems();
   updateMemoryNodePositions();
   updateShipReadout();
 }
@@ -446,7 +472,6 @@ function clearCanvases() {
 
 function drawStarfield() {
   starContext.save();
-  drawMilkyWay();
 
   stars.forEach((star) => {
     const projected = projectWorld(star);
@@ -465,6 +490,67 @@ function drawStarfield() {
   starContext.restore();
 }
 
+function drawSolarSystems() {
+  if (!solarSystems.length) return;
+
+  lineContext.save();
+  lineContext.globalCompositeOperation = "screen";
+
+  solarSystems.forEach((system) => {
+    const point = projectWorld(system);
+    if (!point.visible || !isNearScreen(point, 260) || point.depth > 15000) return;
+
+    const scale = clamp(point.scale, 0.12, 1.15);
+    const sunRadius = clamp(system.sunRadius * scale, 4, 30);
+    const sunGradient = lineContext.createRadialGradient(
+      point.x,
+      point.y,
+      0,
+      point.x,
+      point.y,
+      sunRadius * 3.3
+    );
+    sunGradient.addColorStop(0, "rgba(255, 236, 160, 0.96)");
+    sunGradient.addColorStop(0.28, "rgba(255, 176, 74, 0.46)");
+    sunGradient.addColorStop(1, "rgba(255, 176, 74, 0)");
+
+    lineContext.fillStyle = sunGradient;
+    lineContext.beginPath();
+    lineContext.arc(point.x, point.y, sunRadius * 3.3, 0, Math.PI * 2);
+    lineContext.fill();
+
+    lineContext.fillStyle = "rgba(255, 231, 146, 0.96)";
+    lineContext.shadowColor = "rgba(255, 213, 96, 0.8)";
+    lineContext.shadowBlur = 18;
+    lineContext.beginPath();
+    lineContext.arc(point.x, point.y, sunRadius, 0, Math.PI * 2);
+    lineContext.fill();
+
+    system.planets.forEach((planet) => {
+      const orbitX = planet.orbit * scale;
+      const orbitY = orbitX * 0.42;
+      const planetX = point.x + Math.cos(planet.angle) * orbitX;
+      const planetY = point.y + Math.sin(planet.angle) * orbitY;
+      const radius = clamp(planet.radius * scale, 1.8, 7);
+
+      lineContext.shadowBlur = 0;
+      lineContext.strokeStyle = "rgba(124, 244, 255, 0.16)";
+      lineContext.lineWidth = Math.max(0.6, scale * 1.1);
+      lineContext.beginPath();
+      lineContext.ellipse(point.x, point.y, orbitX, orbitY, 0, 0, Math.PI * 2);
+      lineContext.stroke();
+
+      lineContext.fillStyle = planet.color;
+      lineContext.shadowColor = planet.color;
+      lineContext.shadowBlur = 10;
+      lineContext.beginPath();
+      lineContext.arc(planetX, planetY, radius, 0, Math.PI * 2);
+      lineContext.fill();
+    });
+  });
+
+  lineContext.restore();
+}
 function drawConstellationLines() {
   if (projectedMemories.length < 2) return;
 
@@ -699,79 +785,6 @@ function setupCanvases() {
   lineContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 }
 
-function createMilkyWayDust() {
-  milkyWayDust.length = 0;
-
-  for (let index = 0; index < 320; index += 1) {
-    const softOffset = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
-    milkyWayDust.push({
-      u: Math.random() * 1.18 - 0.09,
-      v: softOffset,
-      size: Math.random() * 1.9 + 0.35,
-      alpha: Math.random() * 0.34 + 0.12,
-      color: ["124, 244, 255", "255, 255, 255", "255, 224, 138", "255, 181, 235"][Math.floor(Math.random() * 4)],
-    });
-  }
-}
-
-function drawMilkyWay() {
-  const driftX = Math.sin(camera.yaw) * 34;
-  const driftY = Math.sin(camera.pitch) * 30;
-
-  starContext.save();
-  starContext.globalCompositeOperation = "screen";
-  starContext.translate(scene.centerX + driftX, scene.centerY + driftY);
-  starContext.rotate(-0.38);
-
-  const bandWidth = scene.width * 1.55;
-  const bandHeight = scene.height * 0.38;
-  const bandGradient = starContext.createLinearGradient(-bandWidth / 2, 0, bandWidth / 2, 0);
-  bandGradient.addColorStop(0, "rgba(124, 244, 255, 0)");
-  bandGradient.addColorStop(0.32, "rgba(124, 244, 255, 0.08)");
-  bandGradient.addColorStop(0.48, "rgba(255, 255, 255, 0.13)");
-  bandGradient.addColorStop(0.58, "rgba(255, 224, 138, 0.08)");
-  bandGradient.addColorStop(0.72, "rgba(255, 116, 212, 0.07)");
-  bandGradient.addColorStop(1, "rgba(124, 244, 255, 0)");
-
-  starContext.filter = "blur(10px)";
-  starContext.fillStyle = bandGradient;
-  starContext.fillRect(-bandWidth / 2, -bandHeight / 2, bandWidth, bandHeight);
-  starContext.filter = "none";
-
-  drawNebulaCloud(-scene.width * 0.24, -scene.height * 0.03, scene.width * 0.22, "124, 244, 255", 0.13);
-  drawNebulaCloud(scene.width * 0.18, scene.height * 0.05, scene.width * 0.18, "255, 116, 212", 0.1);
-  drawNebulaCloud(scene.width * 0.34, -scene.height * 0.08, scene.width * 0.14, "255, 224, 138", 0.08);
-
-  milkyWayDust.forEach((dust) => {
-    const x = (dust.u - 0.5) * bandWidth;
-    const y = dust.v * bandHeight * 0.58;
-    const radius = dust.size;
-
-    starContext.beginPath();
-    starContext.fillStyle = `rgba(${dust.color}, ${dust.alpha})`;
-    starContext.shadowColor = `rgba(${dust.color}, ${dust.alpha + 0.1})`;
-    starContext.shadowBlur = radius * 4.8;
-    starContext.arc(x, y, radius, 0, Math.PI * 2);
-    starContext.fill();
-  });
-
-  starContext.restore();
-}
-
-function drawNebulaCloud(x, y, radius, color, alpha) {
-  starContext.save();
-  starContext.scale(1, 0.48);
-  const scaledY = y / 0.48;
-  const gradient = starContext.createRadialGradient(x, scaledY, 0, x, scaledY, radius);
-  gradient.addColorStop(0, `rgba(${color}, ${alpha})`);
-  gradient.addColorStop(0.45, `rgba(${color}, ${alpha * 0.45})`);
-  gradient.addColorStop(1, `rgba(${color}, 0)`);
-  starContext.fillStyle = gradient;
-  starContext.beginPath();
-  starContext.arc(x, scaledY, radius, 0, Math.PI * 2);
-  starContext.fill();
-  starContext.restore();
-}
 function createStars() {
   stars.length = 0;
 
@@ -1109,6 +1122,14 @@ function formatShortDate(value) {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
+}
+
+function formatOrbitDate(value) {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}/${month}/${day}`;
 }
 
 function escapeHtml(value) {
