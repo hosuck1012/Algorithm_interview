@@ -190,7 +190,7 @@ function bindEvents() {
   spaceViewport.addEventListener("pointermove", (event) => {
     if (!pointer.isLooking) return;
 
-    camera.yaw -= event.movementX * 0.0026;
+    camera.yaw += event.movementX * 0.0026;
     camera.pitch = clamp(camera.pitch - event.movementY * 0.0024, -1.08, 1.08);
   });
 
@@ -253,10 +253,12 @@ function assignWorldPositions() {
   memories.forEach((memory, index) => {
     const angle = index * 0.72;
     const drift = Math.sin(index * 0.17) * 260;
+    const verticalBand = ((index % 9) - 4) * 165;
+    const verticalWave = Math.sin(index * 0.43) * 180 + Math.cos(index * 0.19) * 90;
 
     memory.world = {
-      x: Math.sin(angle) * 760 + drift,
-      y: Math.cos(index * 0.51) * 360 + Math.sin(index * 0.13) * 180,
+      x: Math.sin(angle) * 820 + drift,
+      y: verticalBand + verticalWave,
       z: -900 - index * 330,
     };
   });
@@ -358,8 +360,8 @@ function updateCamera(deltaSeconds) {
   const right = getRightVector();
   let moved = false;
 
-  if (keys.has("arrowleft")) camera.yaw += turnSpeed * deltaSeconds;
-  if (keys.has("arrowright")) camera.yaw -= turnSpeed * deltaSeconds;
+  if (keys.has("arrowleft")) camera.yaw -= turnSpeed * deltaSeconds;
+  if (keys.has("arrowright")) camera.yaw += turnSpeed * deltaSeconds;
   if (keys.has("arrowup")) camera.pitch = clamp(camera.pitch + turnSpeed * deltaSeconds, -1.08, 1.08);
   if (keys.has("arrowdown")) camera.pitch = clamp(camera.pitch - turnSpeed * deltaSeconds, -1.08, 1.08);
 
@@ -702,7 +704,7 @@ function createStars() {
       x: Math.random() * 16000 - 8000,
       y: Math.random() * 9000 - 4500,
       z: Math.random() * -62000 + 5000,
-      size: Math.random() * 1.6 + 0.45,
+      size: index % 53 === 0 ? Math.random() * 2.2 + 2.2 : Math.random() * 1.6 + 0.45,
       color: ["#ffffff", "#7cf4ff", "#ffe08a", "#ffb5eb"][Math.floor(Math.random() * 4)],
     });
   }
@@ -969,7 +971,7 @@ function createTestMemories(count) {
 
     return {
       id: createId(),
-      owner: ["나", "여자친구", "우리"][index % 3],
+      owner: ["최호석", "정혜준"][index % 2],
       date: toDateInputValue(date),
       caption: `테스트 별자리 ${String(index + 1).padStart(3, "0")}`,
       imageData: createTestImage(index),

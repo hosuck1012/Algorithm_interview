@@ -100,6 +100,22 @@ select:focus-visible,
   opacity: 0.42;
   pointer-events: none;
 }
+.space-viewport::after {
+  content: "";
+  position: absolute;
+  inset: -24%;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at 44% 48%, rgba(255, 255, 255, 0.11), transparent 8%),
+    radial-gradient(ellipse at 51% 52%, rgba(124, 244, 255, 0.12), transparent 17%),
+    radial-gradient(ellipse at 58% 45%, rgba(255, 116, 212, 0.08), transparent 19%),
+    linear-gradient(112deg, transparent 26%, rgba(124, 244, 255, 0.055) 40%, rgba(255, 255, 255, 0.075) 50%, rgba(255, 224, 138, 0.045) 58%, transparent 72%);
+  filter: blur(9px);
+  mix-blend-mode: screen;
+  opacity: 0.62;
+  transform: rotate(-13deg) scale(1.08);
+  pointer-events: none;
+}
 
 .space-viewport.is-dragging {
   cursor: grabbing;
@@ -471,10 +487,11 @@ input[type="range"] {
 }
 
 .current-memory {
-  left: 18px;
-  bottom: 26px;
-  width: min(430px, calc(100vw - 36px));
+  left: 50%;
+  bottom: 24px;
+  width: min(480px, 38vw);
   padding: 16px;
+  transform: translateX(-50%);
 }
 
 .current-memory__meta {
@@ -747,6 +764,7 @@ input[type="range"] {
     width: calc(100% - 24px);
     max-height: none;
     margin: 12px;
+    transform: none;
   }
 
   .ship-hud--top {
