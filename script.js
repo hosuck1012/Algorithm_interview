@@ -60,6 +60,7 @@ const pointer = {
 const keys = new Set();
 const stars = [];
 const solarSystems = [];
+const deepSpaceObjects = [];
 const starContext = starCanvas.getContext("2d");
 const lineContext = constellationCanvas.getContext("2d");
 let memoryNodes = [];
@@ -240,6 +241,7 @@ function renderData({ warpToActive = false } = {}) {
 
   assignWorldPositions();
   assignSolarSystems();
+  assignDeepSpaceObjects();
   renderMemoryNodes();
   renderTimeline();
   emptyState.classList.toggle("is-hidden", memories.length > 0);
@@ -281,13 +283,40 @@ function assignSolarSystems() {
       x: (before.x + after.x) / 2 + Math.sin(seed) * 340,
       y: (before.y + after.y) / 2 + Math.cos(seed * 0.7) * 240,
       z: (before.z + after.z) / 2,
-      sunRadius: 34 + (index % 3) * 7,
+      sunRadius: 52 + (index % 3) * 10,
       planets: [
-        { orbit: 74, radius: 6, angle: seed, color: "#8fe9ff" },
-        { orbit: 112, radius: 8, angle: seed + 1.8, color: "#ffd98b" },
-        { orbit: 153, radius: 5, angle: seed + 3.1, color: "#ff9ad8" },
-        { orbit: 196, radius: 7, angle: seed + 4.4, color: "#c7d6ff" },
+        { orbit: 124, radius: 10, angle: seed, color: "#8fe9ff" },
+        { orbit: 190, radius: 13, angle: seed + 1.8, color: "#ffd98b" },
+        { orbit: 266, radius: 8, angle: seed + 3.1, color: "#ff9ad8" },
+        { orbit: 345, radius: 12, angle: seed + 4.4, color: "#c7d6ff" },
       ],
+    });
+  }
+}
+function assignDeepSpaceObjects() {
+  deepSpaceObjects.length = 0;
+  if (memories.length < 4) return;
+
+  const objectCount = clamp(Math.floor(memories.length / 14), 4, 8);
+
+  for (let index = 0; index < objectCount; index += 1) {
+    const memoryIndex = clamp(
+      Math.floor(((index + 1) / (objectCount + 1)) * memories.length),
+      1,
+      memories.length - 2
+    );
+    const anchor = memories[memoryIndex].world;
+    const seed = (index + 1) * 2.391;
+
+    deepSpaceObjects.push({
+      type: index % 2 === 0 ? "spiral" : "nebula",
+      x: anchor.x + Math.cos(seed) * 1300,
+      y: anchor.y + Math.sin(seed * 0.72) * 760,
+      z: anchor.z - 520 - index * 180,
+      radius: index % 2 === 0 ? 360 + (index % 3) * 54 : 430 + (index % 3) * 70,
+      rotation: seed,
+      colorA: index % 3 === 0 ? "124, 244, 255" : "255, 174, 226",
+      colorB: index % 3 === 1 ? "255, 224, 138" : "173, 197, 255",
     });
   }
 }
@@ -459,6 +488,7 @@ function drawScene() {
   drawStarfield();
   projectedMemories = memories.map((memory) => projectWorld(memory.world));
   updateActiveFromView();
+  drawDeepSpaceObjects();
   drawConstellationLines();
   drawSolarSystems();
   updateMemoryNodePositions();
@@ -490,6 +520,86 @@ function drawStarfield() {
   starContext.restore();
 }
 
+function drawDeepSpaceObjects() {
+  if (!deepSpaceObjects.length) return;
+
+  lineContext.save();
+  lineContext.globalCompositeOperation = "screen";
+
+  deepSpaceObjects.forEach((object) => {
+    const point = projectWorld(object);
+    if (!point.visible || !isNearScreen(point, 520) || point.depth > 24000) return;
+
+    const scale = clamp(point.scale * 1.55, 0.18, 1.1);
+
+    if (object.type === "spiral") {
+      drawSpiralGalaxy(object, point, scale);
+    } else {
+      drawNebula(object, point, scale);
+    }
+  });
+
+  lineContext.restore();
+}
+
+function drawSpiralGalaxy(object, point, scale) {
+  const radius = clamp(object.radius * scale, 86, 280);
+  const core = lineContext.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 0.72);
+  core.addColorStop(0, "rgba(255, 255, 255, 0.62)");
+  core.addColorStop(0.25, `rgba(${object.colorA}, 0.28)`);
+  core.addColorStop(1, `rgba(${object.colorB}, 0)`);
+
+  lineContext.fillStyle = core;
+  lineContext.beginPath();
+  lineContext.arc(point.x, point.y, radius * 0.72, 0, Math.PI * 2);
+  lineContext.fill();
+
+  for (let arm = 0; arm < 2; arm += 1) {
+    lineContext.beginPath();
+    for (let step = 0; step <= 24; step += 1) {
+      const progress = step / 24;
+      const angle = object.rotation + arm * Math.PI + progress * Math.PI * 1.45;
+      const armRadius = radius * (0.16 + progress * 0.82);
+      const x = point.x + Math.cos(angle) * armRadius;
+      const y = point.y + Math.sin(angle) * armRadius * 0.46;
+
+      if (step === 0) {
+        lineContext.moveTo(x, y);
+      } else {
+        lineContext.lineTo(x, y);
+      }
+    }
+
+    lineContext.strokeStyle = `rgba(${arm === 0 ? object.colorA : object.colorB}, 0.34)`;
+    lineContext.lineWidth = Math.max(1.4, radius * 0.025);
+    lineContext.shadowColor = `rgba(${arm === 0 ? object.colorA : object.colorB}, 0.42)`;
+    lineContext.shadowBlur = 18;
+    lineContext.stroke();
+  }
+}
+
+function drawNebula(object, point, scale) {
+  const radius = clamp(object.radius * scale, 100, 320);
+  const clouds = [
+    { x: -0.26, y: -0.06, r: 0.72, color: object.colorA, alpha: 0.18 },
+    { x: 0.24, y: 0.1, r: 0.62, color: object.colorB, alpha: 0.15 },
+    { x: 0.02, y: -0.18, r: 0.5, color: "255, 255, 255", alpha: 0.08 },
+  ];
+
+  clouds.forEach((cloud) => {
+    const x = point.x + cloud.x * radius;
+    const y = point.y + cloud.y * radius;
+    const gradient = lineContext.createRadialGradient(x, y, 0, x, y, radius * cloud.r);
+    gradient.addColorStop(0, `rgba(${cloud.color}, ${cloud.alpha})`);
+    gradient.addColorStop(0.48, `rgba(${cloud.color}, ${cloud.alpha * 0.38})`);
+    gradient.addColorStop(1, `rgba(${cloud.color}, 0)`);
+
+    lineContext.fillStyle = gradient;
+    lineContext.beginPath();
+    lineContext.arc(x, y, radius * cloud.r, 0, Math.PI * 2);
+    lineContext.fill();
+  });
+}
 function drawSolarSystems() {
   if (!solarSystems.length) return;
 
@@ -500,8 +610,8 @@ function drawSolarSystems() {
     const point = projectWorld(system);
     if (!point.visible || !isNearScreen(point, 260) || point.depth > 15000) return;
 
-    const scale = clamp(point.scale, 0.12, 1.15);
-    const sunRadius = clamp(system.sunRadius * scale, 4, 30);
+    const scale = clamp(point.scale * 2.15, 0.38, 2.2);
+    const sunRadius = clamp(system.sunRadius * scale, 14, 82);
     const sunGradient = lineContext.createRadialGradient(
       point.x,
       point.y,
@@ -531,7 +641,7 @@ function drawSolarSystems() {
       const orbitY = orbitX * 0.42;
       const planetX = point.x + Math.cos(planet.angle) * orbitX;
       const planetY = point.y + Math.sin(planet.angle) * orbitY;
-      const radius = clamp(planet.radius * scale, 1.8, 7);
+      const radius = clamp(planet.radius * scale, 4, 18);
 
       lineContext.shadowBlur = 0;
       lineContext.strokeStyle = "rgba(124, 244, 255, 0.16)";
