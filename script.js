@@ -3,6 +3,11 @@
 const databaseName = "our-time-gallery-db";
 const databaseVersion = 1;
 const imageStoreName = "memoryImages";
+const sharedImageMaxDimension = 1600;
+const sharedImageQuality = 0.78;
+const sharedImageMaxOriginalBytes = 900 * 1024;
+const sharedUploadRetryCount = 2;
+const sharedUploadRetryDelayMs = 900;
 
 const sharedStorage = {
   owner: "hosuck1012",
@@ -187,7 +192,10 @@ function bindEvents() {
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index];
         const id = createId();
-        const imageData = await readImage(file);
+        const photoNumber = index + 1;
+        setSyncBusy(true, `Preparing photo ${photoNumber} of ${files.length}...`);
+        uploadButton.textContent = `Preparing ${photoNumber}/${files.length}...`;
+        const optimizedImage = await readOptimizedImage(file);
         const capturedDate = useManualDate ? null : await getPhotoTakenDate(file);
 
         createdMemories.push({
@@ -195,15 +203,24 @@ function bindEvents() {
           owner: ownerInput.value,
           date: useManualDate ? fallbackDate : capturedDate || fallbackDate,
           caption: createUploadedCaption(file),
-          imageData,
-          imagePath: createSharedPhotoPath(id, file),
+          imageData: optimizedImage.imageData,
+          imagePath: createSharedPhotoPath(id, {
+            name: file.name,
+            type: optimizedImage.mimeType,
+          }),
+          imageOptimized: optimizedImage.wasOptimized,
           isShared: true,
           isTestMemory: false,
           createdAt: new Date().toISOString(),
         });
       }
 
-      await saveSharedMemories(createdMemories, token);
+      await saveSharedMemories(createdMemories, token, {
+        onProgress: (current, total) => {
+          setSyncBusy(true, `Uploading photo ${current} of ${total}...`);
+          uploadButton.textContent = `Uploading ${current}/${total}...`;
+        },
+      });
       memories = mergeById([...memories, ...createdMemories]).sort(compareByDate);
       activeIndex = memories.findIndex((item) => item.id === createdMemories[0].id);
       resetUploadForm();
@@ -1545,7 +1562,11 @@ async function syncLocalMemoriesToSharedStorage() {
 
   try {
     setSyncBusy(true, `Syncing ${localMemories.length} local photo${localMemories.length === 1 ? "" : "s"}...`);
-    const syncedMemories = await saveSharedMemories(localMemories, token);
+    const syncedMemories = await saveSharedMemories(localMemories, token, {
+      onProgress: (current, total) => {
+        setSyncBusy(true, `Syncing local photo ${current} of ${total}...`);
+      },
+    });
     const syncedById = new Map(syncedMemories.map((memory) => [memory.id, memory]));
 
     memories = memories.map((memory) => {
@@ -1572,11 +1593,18 @@ async function syncLocalMemoriesToSharedStorage() {
   }
 }
 
-async function saveSharedMemories(newMemories, token) {
-  const preparedMemories = newMemories.map(prepareSharedMemory);
+async function saveSharedMemories(newMemories, token, options = {}) {
+  const { onProgress = () => {} } = options;
+  const preparedMemories = [];
 
-  for (const memory of preparedMemories) {
+  for (let index = 0; index < newMemories.length; index += 1) {
+    const memory = await prepareSharedMemoryForUpload(newMemories[index]);
+    preparedMemories.push(memory);
+    onProgress(index + 1, newMemories.length, memory);
     await uploadSharedPhoto(memory, token);
+    if (index < newMemories.length - 1) {
+      await wait(sharedUploadRetryDelayMs / 2);
+    }
   }
 
   await updateSharedManifest(
@@ -1675,7 +1703,7 @@ async function deleteSharedPhoto(path, token) {
 
 async function requestGithubContent(path, options = {}) {
   const { token = "", allowMissing = false } = options;
-  const response = await fetch(
+  const response = await fetchGithub(
     `${githubApiBase}/contents/${encodeGithubPath(path)}?ref=${encodeURIComponent(sharedStorage.branch)}`,
     { headers: createGithubHeaders(token) }
   );
@@ -1694,7 +1722,7 @@ async function putGithubContent(path, options) {
 
   if (sha) body.sha = sha;
 
-  const response = await fetch(`${githubApiBase}/contents/${encodeGithubPath(path)}`, {
+  const response = await fetchGithub(`${githubApiBase}/contents/${encodeGithubPath(path)}`, {
     method: "PUT",
     headers: createGithubHeaders(token),
     body: JSON.stringify(body),
@@ -1705,7 +1733,7 @@ async function putGithubContent(path, options) {
 
 async function deleteGithubContent(path, options) {
   const { message, sha, token } = options;
-  const response = await fetch(`${githubApiBase}/contents/${encodeGithubPath(path)}`, {
+  const response = await fetchGithub(`${githubApiBase}/contents/${encodeGithubPath(path)}`, {
     method: "DELETE",
     headers: createGithubHeaders(token),
     body: JSON.stringify({
@@ -1733,6 +1761,27 @@ async function readGithubResponse(response) {
     throw error;
   }
   return data;
+}
+
+async function fetchGithub(url, options) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= sharedUploadRetryCount; attempt += 1) {
+    try {
+      return await fetch(url, options);
+    } catch (error) {
+      lastError = error;
+      if (attempt < sharedUploadRetryCount) {
+        await wait(sharedUploadRetryDelayMs * (attempt + 1));
+      }
+    }
+  }
+
+  throw new Error(
+    lastError?.message === "Failed to fetch"
+      ? "Network upload failed. The photos are compressed before upload now; try again, or upload fewer photos at once if the network is unstable."
+      : lastError?.message || "Network upload failed."
+  );
 }
 
 function createGithubHeaders(token = "") {
@@ -1777,6 +1826,22 @@ function prepareSharedMemory(memory) {
     isTestMemory: false,
     createdAt: memory.createdAt || new Date().toISOString(),
   };
+}
+
+async function prepareSharedMemoryForUpload(memory) {
+  const preparedMemory = prepareSharedMemory(memory);
+
+  if (!preparedMemory.imageOptimized && preparedMemory.imageData) {
+    const optimizedImage = await optimizeImageData(preparedMemory.imageData);
+    preparedMemory.imageData = optimizedImage.imageData;
+    preparedMemory.imageOptimized = optimizedImage.wasOptimized;
+
+    if (optimizedImage.wasOptimized) {
+      preparedMemory.imagePath = replaceImagePathExtension(preparedMemory.imagePath, "jpg");
+    }
+  }
+
+  return preparedMemory;
 }
 
 function toSharedStoredMemory(memory) {
@@ -1863,6 +1928,145 @@ function getMemoryFileDescriptor(memory) {
   };
 }
 
+async function readOptimizedImage(file) {
+  if (isUnsupportedUploadFormat(file.type)) {
+    throw new Error("This browser cannot upload HEIC/HEIF directly. Convert the photo to JPEG first.");
+  }
+
+  const imageSource = await loadImageSource(file);
+  if (!imageSource) {
+    return {
+      imageData: await readImage(file),
+      mimeType: file.type || "image/jpeg",
+      wasOptimized: false,
+    };
+  }
+
+  try {
+    const shouldOptimize =
+      file.size > sharedImageMaxOriginalBytes ||
+      Math.max(imageSource.width, imageSource.height) > sharedImageMaxDimension;
+
+    if (!shouldOptimize) {
+      return {
+        imageData: await readImage(file),
+        mimeType: file.type || "image/jpeg",
+        wasOptimized: false,
+      };
+    }
+
+    return renderOptimizedImage(imageSource);
+  } finally {
+    imageSource.close?.();
+  }
+}
+
+async function optimizeImageData(imageData) {
+  const mimeType = getDataUrlMime(imageData);
+  if (!imageData || !mimeType || isUnsupportedUploadFormat(mimeType)) {
+    return {
+      imageData,
+      mimeType: mimeType || "image/jpeg",
+      wasOptimized: false,
+    };
+  }
+
+  if (getDataUrlByteLength(imageData) <= sharedImageMaxOriginalBytes) {
+    return {
+      imageData,
+      mimeType,
+      wasOptimized: false,
+    };
+  }
+
+  const blob = dataUrlToBlob(imageData);
+  const imageSource = await loadImageSource(blob);
+  if (!imageSource) {
+    return {
+      imageData,
+      mimeType,
+      wasOptimized: false,
+    };
+  }
+
+  try {
+    return renderOptimizedImage(imageSource);
+  } finally {
+    imageSource.close?.();
+  }
+}
+
+function renderOptimizedImage(imageSource) {
+  const scale = Math.min(
+    1,
+    sharedImageMaxDimension / Math.max(imageSource.width, imageSource.height)
+  );
+  const width = Math.max(1, Math.round(imageSource.width * scale));
+  const height = Math.max(1, Math.round(imageSource.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d", { alpha: false });
+  context.fillStyle = "#05070d";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(imageSource.source, 0, 0, width, height);
+
+  return {
+    imageData: canvas.toDataURL("image/jpeg", sharedImageQuality),
+    mimeType: "image/jpeg",
+    wasOptimized: true,
+  };
+}
+
+async function loadImageSource(input) {
+  if (window.createImageBitmap) {
+    try {
+      const bitmap = await createImageBitmap(input, { imageOrientation: "from-image" });
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        close: () => bitmap.close(),
+      };
+    } catch {
+      // Fall back to HTMLImageElement decoding below.
+    }
+  }
+
+  return await loadImageElement(input);
+}
+
+function loadImageElement(input) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(input);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({
+        source: image,
+        width: image.naturalWidth || image.width,
+        height: image.naturalHeight || image.height,
+      });
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    image.src = url;
+  });
+}
+
+function isUnsupportedUploadFormat(mimeType = "") {
+  return ["image/heic", "image/heif"].includes(mimeType.toLowerCase());
+}
+
+function replaceImagePathExtension(path, extension) {
+  if (!path) return path;
+  return path.replace(/\.[a-z0-9]+$/i, `.${extension}`);
+}
+
 function getImageExtension(file) {
   const mimeExtensions = {
     "image/jpeg": "jpg",
@@ -1895,6 +2099,24 @@ function getDataUrlBase64(dataUrl) {
     throw new Error("Only browser-uploaded image data can be synced.");
   }
   return match[1];
+}
+
+function getDataUrlByteLength(dataUrl) {
+  const base64 = getDataUrlBase64(dataUrl);
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.floor((base64.length * 3) / 4) - padding;
+}
+
+function dataUrlToBlob(dataUrl) {
+  const mimeType = getDataUrlMime(dataUrl) || "image/jpeg";
+  const binary = atob(getDataUrlBase64(dataUrl));
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeType });
 }
 
 function encodeGithubPath(path) {
@@ -2440,6 +2662,12 @@ function getDistance(from, to) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
 }
 
 function hexToRgba(hex, alpha) {
