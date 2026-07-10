@@ -430,6 +430,69 @@ p {
   line-height: 1.55;
 }
 
+.sync-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid rgba(124, 244, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.sync-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sync-panel__header .eyebrow {
+  margin: 0;
+}
+
+.sync-panel__header span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-align: right;
+}
+
+.sync-panel[data-sync-state="ok"] #syncStatus {
+  color: #a8ffd2;
+}
+
+.sync-panel[data-sync-state="warn"] #syncStatus,
+.sync-panel[data-sync-state="busy"] #syncStatus {
+  color: var(--accent-gold);
+}
+
+.sync-panel[data-sync-state="error"] #syncStatus {
+  color: #ffb6bf;
+}
+
+.sync-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sync-actions button {
+  min-height: 38px;
+  padding: 0 9px;
+  font-size: 0.76rem;
+}
+
+#refreshButton {
+  grid-column: 1 / -1;
+}
+
+#saveTokenButton {
+  border: 1px solid rgba(220, 238, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+}
+
 .upload-panel {
   display: grid;
   gap: 12px;
@@ -893,7 +956,8 @@ input[type="range"] {
 
 @media (max-width: 640px) {
   .field-grid,
-  .button-grid {
+  .button-grid,
+  .sync-actions {
     grid-template-columns: 1fr;
   }
 

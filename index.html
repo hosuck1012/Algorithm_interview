@@ -56,7 +56,27 @@
             <p class="eyebrow">Flight Deck</p>
             <p>Move with WASD, drag the mouse to rotate, and use the wheel to move forward or backward.</p>
           </div>
-
+          <section class="sync-panel" id="syncPanel" aria-label="Shared photo storage">
+            <div class="sync-panel__header">
+              <p class="eyebrow">Shared Storage</p>
+              <span id="syncStatus">Connecting...</span>
+            </div>
+            <label>
+              GitHub write token
+              <input
+                id="githubTokenInput"
+                type="password"
+                autocomplete="off"
+                placeholder="Required for upload and delete"
+              />
+            </label>
+            <div class="sync-actions">
+              <button id="saveTokenButton" type="button">Save token</button>
+              <button id="syncLocalButton" type="button">Sync this device</button>
+              <button id="refreshButton" type="button">Refresh shared photos</button>
+            </div>
+            <small class="field-hint" id="syncHint">Shared photos are loaded from the GitHub repository. Uploads need a write token on this device.</small>
+          </section>
           <form class="upload-panel" id="uploadForm">
             <label class="drop-zone" id="dropZone" for="photoInput">
               <input id="photoInput" type="file" accept="image/*" multiple required />

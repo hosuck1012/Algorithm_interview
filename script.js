@@ -4,6 +4,16 @@ const databaseName = "our-time-gallery-db";
 const databaseVersion = 1;
 const imageStoreName = "memoryImages";
 
+const sharedStorage = {
+  owner: "hosuck1012",
+  repo: "Algorithm_interview",
+  branch: "agent/space-photo-timeline",
+  manifestPath: "data/memories.json",
+  photosPath: "data/photos",
+};
+const githubApiBase = `https://api.github.com/repos/${sharedStorage.owner}/${sharedStorage.repo}`;
+const githubTokenStorageKey = "our-time-gallery:github-token";
+
 const authStorageKey = "our-time-gallery:auth";
 const allowedLogin = {
   id: "0826",
@@ -41,6 +51,13 @@ const shipPosition = document.querySelector("#shipPosition");
 const timeline = document.querySelector("#timeline");
 const nodeTemplate = document.querySelector("#memoryNodeTemplate");
 const timelineTemplate = document.querySelector("#timelineItemTemplate");
+const syncPanel = document.querySelector("#syncPanel");
+const syncStatus = document.querySelector("#syncStatus");
+const syncHint = document.querySelector("#syncHint");
+const githubTokenInput = document.querySelector("#githubTokenInput");
+const saveTokenButton = document.querySelector("#saveTokenButton");
+const syncLocalButton = document.querySelector("#syncLocalButton");
+const refreshButton = document.querySelector("#refreshButton");
 
 let memories = [];
 let activeIndex = 0;
@@ -52,6 +69,9 @@ let autoTour = false;
 let tourIndex = 0;
 let lastFrameTime = 0;
 let shouldRewriteStorage = false;
+let sharedStorageAvailable = false;
+let localOnlyMemoryCount = 0;
+let syncBusy = false;
 
 const scene = {
   width: 0,
@@ -95,6 +115,7 @@ async function initializeApp() {
   setupCanvases();
   createStars();
   bindEvents();
+  loadSavedGithubToken();
 
   const storedMemories = await loadMemories();
   memories = storedMemories ?? createTestMemories(100);
@@ -104,6 +125,7 @@ async function initializeApp() {
     await saveMemories();
   }
 
+  refreshSharedMemories({ silent: true });
   window.requestAnimationFrame(renderFrame);
 }
 
@@ -134,43 +156,64 @@ function bindEvents() {
   });
   logoutButton.addEventListener("click", handleLogout);
 
+  saveTokenButton.addEventListener("click", handleTokenSave);
+  syncLocalButton.addEventListener("click", syncLocalMemoriesToSharedStorage);
+  refreshButton.addEventListener("click", () => refreshSharedMemories());
+  githubTokenInput.addEventListener("input", updateSyncControls);
+
   uploadForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const files = getSelectedImageFiles();
     if (!files.length) return;
 
+    const token = getGithubWriteToken();
+    if (!token) {
+      showMissingTokenMessage();
+      return;
+    }
+
     const uploadButton = uploadForm.querySelector("button[type='submit']");
     const originalButtonText = uploadButton.textContent;
     uploadButton.disabled = true;
-    uploadButton.textContent = files.length === 1 ? "Launching photo..." : `Launching ${files.length} photos...`;
+    uploadButton.textContent = files.length === 1 ? "Uploading to shared storage..." : `Uploading ${files.length} photos...`;
 
     try {
+      setSyncBusy(true, "Uploading shared photos...");
       const fallbackDate = dateInput.value || toDateInputValue(new Date());
       const useManualDate = dateWasManuallyEdited;
       const createdMemories = [];
 
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index];
+        const id = createId();
         const imageData = await readImage(file);
         const capturedDate = useManualDate ? null : await getPhotoTakenDate(file);
 
         createdMemories.push({
-          id: createId(),
+          id,
           owner: ownerInput.value,
           date: useManualDate ? fallbackDate : capturedDate || fallbackDate,
           caption: createUploadedCaption(file),
           imageData,
+          imagePath: createSharedPhotoPath(id, file),
+          isShared: true,
           isTestMemory: false,
+          createdAt: new Date().toISOString(),
         });
       }
 
-      memories = [...memories, ...createdMemories].sort(compareByDate);
+      await saveSharedMemories(createdMemories, token);
+      memories = mergeById([...memories, ...createdMemories]).sort(compareByDate);
       activeIndex = memories.findIndex((item) => item.id === createdMemories[0].id);
       resetUploadForm();
       await saveMemories();
+      setSyncStatus(`Shared storage updated with ${createdMemories.length} photo${createdMemories.length === 1 ? "" : "s"}.`, "ok");
       renderData({ warpToActive: true });
+    } catch (error) {
+      handleSyncError("Upload failed", error);
     } finally {
+      setSyncBusy(false);
       uploadButton.disabled = false;
       uploadButton.textContent = originalButtonText;
     }
@@ -344,6 +387,7 @@ function renderData({ warpToActive = false } = {}) {
   renderMemoryNodes();
   renderTimeline();
   emptyState.classList.toggle("is-hidden", memories.length > 0);
+  updateSyncControls();
 
   if (memories.length && warpToActive) {
     warpToMemory(activeIndex);
@@ -419,7 +463,7 @@ function renderMemoryNodes() {
     const date = node.querySelector(".node-date");
     const caption = node.querySelector("strong");
 
-    image.src = memory.imageData;
+    image.src = getMemoryImageSource(memory);
     image.alt = memory.caption;
     date.textContent = `${formatOrbitDate(memory.date)} · ${memory.owner}`;
     caption.textContent = memory.caption;
@@ -461,7 +505,7 @@ function renderTimeline() {
     const title = item.querySelector("strong");
     const caption = item.querySelector("em");
 
-    image.src = memory.imageData;
+    image.src = getMemoryImageSource(memory);
     image.alt = memory.caption;
     date.textContent = `${formatDate(memory.date)} · ${memory.owner}`;
     title.textContent = `Coordinate ${index + 1}`;
@@ -473,13 +517,38 @@ function renderTimeline() {
     });
 
     deleteButton.addEventListener("click", async () => {
-      memories = memories.filter((item) => item.id !== memory.id);
-      activeIndex = clamp(activeIndex, 0, Math.max(memories.length - 1, 0));
-      if (!memory.isTestMemory) {
-        await deleteMemoryImages([memory.id]);
+      const deleteShared = memory.isShared && !memory.isTestMemory;
+      if (deleteShared) {
+        const confirmed = window.confirm("Delete this shared photo for every device?");
+        if (!confirmed) return;
       }
-      await saveMemories();
-      renderData({ warpToActive: true });
+
+      try {
+        if (deleteShared) {
+          const token = getGithubWriteToken();
+          if (!token) {
+            showMissingTokenMessage();
+            return;
+          }
+          setSyncBusy(true, "Deleting shared photo...");
+          await deleteSharedMemory(memory, token);
+        }
+
+        memories = memories.filter((item) => item.id !== memory.id);
+        activeIndex = clamp(activeIndex, 0, Math.max(memories.length - 1, 0));
+        if (!memory.isTestMemory) {
+          await deleteMemoryImages([memory.id]);
+        }
+        await saveMemories();
+        if (deleteShared) {
+          setSyncStatus("Shared photo deleted.", "ok");
+        }
+        renderData({ warpToActive: true });
+      } catch (error) {
+        handleSyncError("Delete failed", error);
+      } finally {
+        setSyncBusy(false);
+      }
     });
 
     timeline.append(item);
@@ -1398,6 +1467,506 @@ function resetUploadForm() {
   setPhotoDateHint("If the photo includes a capture date, it will be filled automatically.");
 }
 
+function loadSavedGithubToken() {
+  const token = localStorage.getItem(githubTokenStorageKey);
+  if (token) {
+    githubTokenInput.placeholder = "Token saved on this device";
+  }
+  updateSyncControls();
+}
+
+function handleTokenSave() {
+  const token = githubTokenInput.value.trim();
+
+  if (!token) {
+    if (localStorage.getItem(githubTokenStorageKey)) {
+      setSyncStatus("Token already saved. Paste a new token to replace it.", "idle");
+      return;
+    }
+
+    showMissingTokenMessage();
+    return;
+  }
+
+  localStorage.setItem(githubTokenStorageKey, token);
+  githubTokenInput.value = "";
+  githubTokenInput.placeholder = "Token saved on this device";
+  setSyncStatus("GitHub token saved on this device.", "ok");
+  updateSyncControls();
+}
+
+async function refreshSharedMemories(options = {}) {
+  const { silent = false } = options;
+  if (syncBusy && !silent) return;
+
+  const activeMemoryId = memories[activeIndex]?.id;
+
+  try {
+    setSyncBusy(true, silent ? "Loading shared storage..." : "Refreshing shared photos...");
+    const { memories: sharedMemories } = await loadSharedManifest();
+    sharedStorageAvailable = true;
+    memories = mergeSharedMemories(sharedMemories);
+    restoreActiveMemory(activeMemoryId);
+    await saveMemories();
+    setSyncStatus(
+      sharedMemories.length
+        ? `Loaded ${sharedMemories.length} shared photo${sharedMemories.length === 1 ? "" : "s"}.`
+        : "Shared storage is ready.",
+      "ok"
+    );
+    renderData({ warpToActive: !silent && memories.length > 0 });
+  } catch (error) {
+    sharedStorageAvailable = false;
+    if (silent) {
+      console.warn("Shared storage could not be loaded.", error);
+      setSyncStatus("Shared storage unavailable. Local photos are still available.", "warn");
+    } else {
+      handleSyncError("Refresh failed", error);
+    }
+    updateSyncControls();
+  } finally {
+    setSyncBusy(false);
+  }
+}
+
+async function syncLocalMemoriesToSharedStorage() {
+  const token = getGithubWriteToken();
+  if (!token) {
+    showMissingTokenMessage();
+    return;
+  }
+
+  const localMemories = getLocalOnlyMemories();
+  if (!localMemories.length) {
+    setSyncStatus("This device has no local-only photos to sync.", "idle");
+    updateSyncControls();
+    return;
+  }
+
+  try {
+    setSyncBusy(true, `Syncing ${localMemories.length} local photo${localMemories.length === 1 ? "" : "s"}...`);
+    const syncedMemories = await saveSharedMemories(localMemories, token);
+    const syncedById = new Map(syncedMemories.map((memory) => [memory.id, memory]));
+
+    memories = memories.map((memory) => {
+      const syncedMemory = syncedById.get(memory.id);
+      if (!syncedMemory) return memory;
+
+      return {
+        ...memory,
+        ...syncedMemory,
+        imageData: memory.imageData || syncedMemory.imageData,
+      };
+    });
+
+    await saveMemories();
+    setSyncStatus(
+      `Synced ${syncedMemories.length} local photo${syncedMemories.length === 1 ? "" : "s"}.`,
+      "ok"
+    );
+    renderData();
+  } catch (error) {
+    handleSyncError("Sync failed", error);
+  } finally {
+    setSyncBusy(false);
+  }
+}
+
+async function saveSharedMemories(newMemories, token) {
+  const preparedMemories = newMemories.map(prepareSharedMemory);
+
+  for (const memory of preparedMemories) {
+    await uploadSharedPhoto(memory, token);
+  }
+
+  await updateSharedManifest(
+    (sharedMemories) => mergeById([...sharedMemories, ...preparedMemories.map(toSharedStoredMemory)]).sort(compareByDate),
+    token,
+    `Add ${preparedMemories.length} shared photo${preparedMemories.length === 1 ? "" : "s"}`
+  );
+
+  return preparedMemories;
+}
+
+async function deleteSharedMemory(memory, token) {
+  await updateSharedManifest(
+    (sharedMemories) => sharedMemories.filter((item) => item.id !== memory.id),
+    token,
+    `Delete shared photo ${memory.id}`
+  );
+  await deleteSharedPhoto(memory.imagePath, token);
+}
+
+async function loadSharedManifest(token = "") {
+  const file = await requestGithubContent(sharedStorage.manifestPath, { token, allowMissing: true });
+  if (!file) return { memories: [], sha: null };
+
+  const decoded = decodeBase64(file.content || "").trim();
+  if (!decoded) return { memories: [], sha: file.sha };
+
+  const parsed = JSON.parse(decoded);
+  const entries = Array.isArray(parsed) ? parsed : parsed.memories || [];
+
+  return {
+    memories: entries.map(normalizeSharedMemory).filter(Boolean),
+    sha: file.sha,
+  };
+}
+
+async function updateSharedManifest(updater, token, message) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const current = await loadSharedManifest(token);
+    const nextMemories = updater(current.memories);
+    const content = encodeBase64(
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          memories: nextMemories.map(toSharedStoredMemory).sort(compareByDate),
+        },
+        null,
+        2
+      )
+    );
+
+    try {
+      await putGithubContent(sharedStorage.manifestPath, {
+        message,
+        content,
+        sha: current.sha,
+        token,
+      });
+      return nextMemories;
+    } catch (error) {
+      if (error.status === 409 && attempt === 0) continue;
+      throw error;
+    }
+  }
+
+  return [];
+}
+
+async function uploadSharedPhoto(memory, token) {
+  if (!memory.imageData) {
+    throw new Error("Photo data is missing from this browser.");
+  }
+
+  const existing = await requestGithubContent(memory.imagePath, { token, allowMissing: true });
+  await putGithubContent(memory.imagePath, {
+    message: `Add shared photo ${memory.id}`,
+    content: getDataUrlBase64(memory.imageData),
+    sha: existing?.sha,
+    token,
+  });
+}
+
+async function deleteSharedPhoto(path, token) {
+  if (!path) return;
+
+  const existing = await requestGithubContent(path, { token, allowMissing: true });
+  if (!existing?.sha) return;
+
+  await deleteGithubContent(path, {
+    message: `Delete shared photo ${path.split("/").pop()}`,
+    sha: existing.sha,
+    token,
+  });
+}
+
+async function requestGithubContent(path, options = {}) {
+  const { token = "", allowMissing = false } = options;
+  const response = await fetch(
+    `${githubApiBase}/contents/${encodeGithubPath(path)}?ref=${encodeURIComponent(sharedStorage.branch)}`,
+    { headers: createGithubHeaders(token) }
+  );
+
+  if (allowMissing && response.status === 404) return null;
+  return await readGithubResponse(response);
+}
+
+async function putGithubContent(path, options) {
+  const { message, content, sha = null, token } = options;
+  const body = {
+    message,
+    content,
+    branch: sharedStorage.branch,
+  };
+
+  if (sha) body.sha = sha;
+
+  const response = await fetch(`${githubApiBase}/contents/${encodeGithubPath(path)}`, {
+    method: "PUT",
+    headers: createGithubHeaders(token),
+    body: JSON.stringify(body),
+  });
+
+  return await readGithubResponse(response);
+}
+
+async function deleteGithubContent(path, options) {
+  const { message, sha, token } = options;
+  const response = await fetch(`${githubApiBase}/contents/${encodeGithubPath(path)}`, {
+    method: "DELETE",
+    headers: createGithubHeaders(token),
+    body: JSON.stringify({
+      message,
+      sha,
+      branch: sharedStorage.branch,
+    }),
+  });
+
+  return await readGithubResponse(response);
+}
+
+async function readGithubResponse(response) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.message || `GitHub request failed with status ${response.status}.`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+function createGithubHeaders(token = "") {
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
+function normalizeSharedMemory(item) {
+  if (!item?.id || !item?.date || !item?.imagePath) return null;
+
+  return {
+    id: String(item.id),
+    owner: item.owner || "Us",
+    date: item.date,
+    caption: item.caption || "A moment worth remembering",
+    imagePath: item.imagePath,
+    isShared: true,
+    isTestMemory: false,
+    createdAt: item.createdAt || null,
+  };
+}
+
+function prepareSharedMemory(memory) {
+  const id = memory.id || createId();
+
+  return {
+    id,
+    owner: memory.owner || "Us",
+    date: memory.date || toDateInputValue(new Date()),
+    caption: memory.caption || "A moment worth remembering",
+    imageData: memory.imageData,
+    imagePath: memory.imagePath || createSharedPhotoPath(id, getMemoryFileDescriptor(memory)),
+    isShared: true,
+    isTestMemory: false,
+    createdAt: memory.createdAt || new Date().toISOString(),
+  };
+}
+
+function toSharedStoredMemory(memory) {
+  return {
+    id: memory.id,
+    owner: memory.owner,
+    date: memory.date,
+    caption: memory.caption,
+    imagePath: memory.imagePath,
+    isShared: true,
+    createdAt: memory.createdAt || new Date().toISOString(),
+  };
+}
+
+function mergeSharedMemories(sharedMemories) {
+  const sharedIds = new Set(sharedMemories.map((memory) => memory.id));
+  const retainedMemories = memories.filter(
+    (memory) => memory.isTestMemory || !memory.isShared || sharedIds.has(memory.id)
+  );
+
+  return mergeById([...retainedMemories, ...sharedMemories]).sort(compareByDate);
+}
+
+function mergeById(items) {
+  const merged = new Map();
+
+  items.forEach((item) => {
+    if (!item?.id) return;
+
+    const existing = merged.get(item.id);
+    if (!existing) {
+      merged.set(item.id, item);
+      return;
+    }
+
+    const isShared = Boolean(existing.isShared || item.isShared);
+    merged.set(item.id, {
+      ...existing,
+      ...item,
+      imageData: item.imageData || existing.imageData,
+      imagePath: item.imagePath || existing.imagePath,
+      createdAt: item.createdAt || existing.createdAt,
+      isShared,
+      isTestMemory: isShared ? false : Boolean(existing.isTestMemory || item.isTestMemory),
+    });
+  });
+
+  return [...merged.values()];
+}
+
+function restoreActiveMemory(activeMemoryId) {
+  if (!memories.length) {
+    activeIndex = 0;
+    return;
+  }
+
+  const matchedIndex = activeMemoryId
+    ? memories.findIndex((memory) => memory.id === activeMemoryId)
+    : -1;
+  activeIndex = clamp(matchedIndex >= 0 ? matchedIndex : activeIndex, 0, memories.length - 1);
+}
+
+function getMemoryImageSource(memory) {
+  if (memory.imageData) return memory.imageData;
+  if (memory.imagePath) return getSharedPhotoUrl(memory.imagePath);
+  return "";
+}
+
+function getSharedPhotoUrl(path) {
+  const encodedRef = sharedStorage.branch.split("/").map(encodeURIComponent).join("/");
+  return `https://raw.githubusercontent.com/${sharedStorage.owner}/${sharedStorage.repo}/${encodedRef}/${encodeGithubPath(path)}`;
+}
+
+function createSharedPhotoPath(id, file) {
+  const safeId = String(id).replace(/[^a-z0-9._-]/gi, "-");
+  return `${sharedStorage.photosPath}/${safeId}.${getImageExtension(file)}`;
+}
+
+function getMemoryFileDescriptor(memory) {
+  const mime = getDataUrlMime(memory.imageData) || "image/jpeg";
+  return {
+    name: `${memory.id || "photo"}.${getImageExtension({ type: mime })}`,
+    type: mime,
+  };
+}
+
+function getImageExtension(file) {
+  const mimeExtensions = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/avif": "avif",
+    "image/bmp": "bmp",
+  };
+
+  if (file?.type && mimeExtensions[file.type.toLowerCase()]) {
+    return mimeExtensions[file.type.toLowerCase()];
+  }
+
+  const nameMatch = /\.([a-z0-9]+)$/i.exec(file?.name || "");
+  const extension = nameMatch?.[1]?.toLowerCase();
+  return ["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp"].includes(extension)
+    ? extension.replace("jpeg", "jpg")
+    : "jpg";
+}
+
+function getDataUrlMime(dataUrl = "") {
+  return /^data:([^;,]+)/i.exec(dataUrl)?.[1]?.toLowerCase() || "";
+}
+
+function getDataUrlBase64(dataUrl) {
+  const match = /^data:[^;,]+;base64,(.+)$/i.exec(dataUrl || "");
+  if (!match) {
+    throw new Error("Only browser-uploaded image data can be synced.");
+  }
+  return match[1];
+}
+
+function encodeGithubPath(path) {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
+
+function encodeBase64(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+}
+
+function decodeBase64(value) {
+  const binary = atob(String(value).replace(/\s/g, ""));
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function getGithubWriteToken() {
+  return githubTokenInput.value.trim() || localStorage.getItem(githubTokenStorageKey) || "";
+}
+
+function getLocalOnlyMemories() {
+  return memories.filter(
+    (memory) => !memory.isTestMemory && !memory.isShared && Boolean(memory.imageData)
+  );
+}
+
+function setSyncBusy(isBusy, message = "") {
+  syncBusy = isBusy;
+  if (message) {
+    setSyncStatus(message, isBusy ? "busy" : "idle");
+  }
+  updateSyncControls();
+}
+
+function setSyncStatus(message, state = "idle") {
+  syncStatus.textContent = message;
+  syncPanel.dataset.syncState = state;
+}
+
+function updateSyncControls() {
+  localOnlyMemoryCount = getLocalOnlyMemories().length;
+  const hasToken = Boolean(getGithubWriteToken());
+
+  saveTokenButton.disabled = syncBusy;
+  syncLocalButton.disabled = syncBusy || !hasToken || localOnlyMemoryCount === 0;
+  refreshButton.disabled = syncBusy;
+
+  syncLocalButton.textContent = localOnlyMemoryCount
+    ? `Sync ${localOnlyMemoryCount} local photo${localOnlyMemoryCount === 1 ? "" : "s"}`
+    : "Sync this device";
+
+  if (!hasToken) {
+    syncHint.textContent = "Paste a GitHub token with repository Contents write access to upload or delete shared photos.";
+  } else if (localOnlyMemoryCount) {
+    syncHint.textContent = `${localOnlyMemoryCount} local photo${localOnlyMemoryCount === 1 ? "" : "s"} can be copied into shared storage.`;
+  } else if (sharedStorageAvailable) {
+    syncHint.textContent = "This device is connected to shared storage.";
+  } else {
+    syncHint.textContent = "Token saved. Refresh to check shared storage.";
+  }
+}
+
+function showMissingTokenMessage() {
+  setSyncStatus("GitHub write token required.", "warn");
+  syncHint.textContent = "Uploads and deletes need a fine-grained GitHub token with Contents read/write access for this repository.";
+  githubTokenInput.focus();
+}
+
+function handleSyncError(label, error) {
+  console.error(label, error);
+  setSyncStatus(`${label}: ${error?.message || "GitHub request failed."}`, "error");
+  updateSyncControls();
+}
+
 async function loadMemories(rawValue = localStorage.getItem(storageKey)) {
   if (rawValue === null) return null;
   shouldRewriteStorage = rawValue.includes('"imageData"');
@@ -1418,7 +1987,9 @@ async function hydrateStoredMemory(item, index) {
   if (!item?.date) return null;
 
   const id = item.id || createId();
-  const isTestMemory = Boolean(item.isTestMemory);
+  const imagePath = item.imagePath || "";
+  const isShared = Boolean(item.isShared || imagePath);
+  const isTestMemory = Boolean(item.isTestMemory) && !isShared;
   let imageData = item.imageData;
 
   if (!imageData && isTestMemory) {
@@ -1429,7 +2000,7 @@ async function hydrateStoredMemory(item, index) {
     imageData = await loadMemoryImage(id);
   }
 
-  if (!imageData) return null;
+  if (!imageData && !imagePath) return null;
 
   return {
     id,
@@ -1437,7 +2008,10 @@ async function hydrateStoredMemory(item, index) {
     date: item.date,
     caption: item.caption || "A moment worth remembering",
     imageData,
+    imagePath,
+    isShared,
     isTestMemory,
+    createdAt: item.createdAt || null,
   };
 }
 
@@ -1448,7 +2022,7 @@ function getSampleImageIndex(item, fallbackIndex) {
 
 async function saveMemories() {
   try {
-    await saveMemoryImages(memories.filter((memory) => !memory.isTestMemory));
+    await saveMemoryImages(memories.filter((memory) => !memory.isTestMemory && memory.imageData));
     localStorage.setItem(storageKey, JSON.stringify(memories.map(toStoredMemory)));
   } catch {
     window.alert("Browser storage failed, so some photos could not be saved.");
@@ -1456,13 +2030,19 @@ async function saveMemories() {
 }
 
 function toStoredMemory(memory) {
-  return {
+  const storedMemory = {
     id: memory.id,
     owner: memory.owner,
     date: memory.date,
     caption: memory.caption,
     isTestMemory: memory.isTestMemory,
   };
+
+  if (memory.imagePath) storedMemory.imagePath = memory.imagePath;
+  if (memory.isShared) storedMemory.isShared = true;
+  if (memory.createdAt) storedMemory.createdAt = memory.createdAt;
+
+  return storedMemory;
 }
 
 function openGalleryDatabase() {
