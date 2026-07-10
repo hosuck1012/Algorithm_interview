@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-10T10:26:15.974Z",
+  "updatedAt": "2026-07-10T11:02:49.673Z",
   "memories": [
     {
       "id": "181f3649-50d5-431b-8f43-c8ac34458861",
@@ -19,15 +19,6 @@
       "imagePath": "data/photos/417178c0-2826-49ce-9f34-b715dddb9631.png",
       "isShared": true,
       "createdAt": "2026-07-10T10:26:10.701Z"
-    },
-    {
-      "id": "f933a44d-6989-4ae9-88a0-7986dbe066ce",
-      "owner": "Choi Ho-seok",
-      "date": "2026-07-10",
-      "caption": "스크린샷 2026 02 26 203816",
-      "imagePath": "data/photos/f933a44d-6989-4ae9-88a0-7986dbe066ce.png",
-      "isShared": true,
-      "createdAt": "2026-07-10T10:22:43.692Z"
     }
   ]
 }
