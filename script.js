@@ -1721,8 +1721,15 @@ async function deleteGithubContent(path, options) {
 async function readGithubResponse(response) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(data.message || `GitHub request failed with status ${response.status}.`);
+    const githubMessage = data.message || `GitHub request failed with status ${response.status}.`;
+    const needsTokenPermissionHelp =
+      response.status === 403 && /resource not accessible by personal access token/i.test(githubMessage);
+    const message = needsTokenPermissionHelp
+      ? "This token cannot write to the repository. Create a fine-grained token for hosuck1012/Algorithm_interview with Contents set to Read and write, then save it again."
+      : githubMessage;
+    const error = new Error(message);
     error.status = response.status;
+    error.githubMessage = githubMessage;
     throw error;
   }
   return data;
@@ -1957,13 +1964,16 @@ function updateSyncControls() {
 
 function showMissingTokenMessage() {
   setSyncStatus("GitHub write token required.", "warn");
-  syncHint.textContent = "Uploads and deletes need a fine-grained GitHub token with Contents read/write access for this repository.";
+  syncHint.textContent = "Use a fine-grained token owned by hosuck1012, limited to Algorithm_interview, with Contents set to Read and write.";
   githubTokenInput.focus();
 }
 
 function handleSyncError(label, error) {
   console.error(label, error);
   setSyncStatus(`${label}: ${error?.message || "GitHub request failed."}`, "error");
+  if (error?.status === 403) {
+    syncHint.textContent = "Check that the token owner is hosuck1012, repository access includes Algorithm_interview, and Contents permission is Read and write.";
+  }
   updateSyncControls();
 }
 
