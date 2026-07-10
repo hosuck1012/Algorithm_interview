@@ -1,7 +1,214 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-10T11:04:52.003Z",
+  "updatedAt": "2026-07-10T11:11:55.831Z",
   "memories": [
+    {
+      "id": "807f7d79-7e8f-49ea-84bf-89b70f58cbda",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-18",
+      "caption": "IMG 3053",
+      "imagePath": "data/photos/807f7d79-7e8f-49ea-84bf-89b70f58cbda.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:22.625Z"
+    },
+    {
+      "id": "37df6e97-bf66-410e-ba9c-21677af86930",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-18",
+      "caption": "IMG 3051",
+      "imagePath": "data/photos/37df6e97-bf66-410e-ba9c-21677af86930.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:22.777Z"
+    },
+    {
+      "id": "e150227e-3813-4248-950a-ec122a7db374",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-19",
+      "caption": "IMG 3065",
+      "imagePath": "data/photos/e150227e-3813-4248-950a-ec122a7db374.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:22.357Z"
+    },
+    {
+      "id": "a2f2b3a7-5eba-404c-a5fb-053b15302aa0",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-22",
+      "caption": "IMG 3126",
+      "imagePath": "data/photos/a2f2b3a7-5eba-404c-a5fb-053b15302aa0.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:21.586Z"
+    },
+    {
+      "id": "35a1fb24-7a6a-4ad7-85c8-b20967bc311e",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-22",
+      "caption": "IMG 3119",
+      "imagePath": "data/photos/35a1fb24-7a6a-4ad7-85c8-b20967bc311e.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:21.732Z"
+    },
+    {
+      "id": "1df9b5dd-42a2-41d2-b5d7-d02fa78dbb49",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-22",
+      "caption": "IMG 3090",
+      "imagePath": "data/photos/1df9b5dd-42a2-41d2-b5d7-d02fa78dbb49.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:22.041Z"
+    },
+    {
+      "id": "4325987e-e7f8-417f-9b6a-d3554919e176",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-22",
+      "caption": "IMG 3131",
+      "imagePath": "data/photos/4325987e-e7f8-417f-9b6a-d3554919e176.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:22.180Z"
+    },
+    {
+      "id": "83b4e9a4-fa97-4fd3-9306-f95d1170580d",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-24",
+      "caption": "IMG 3156",
+      "imagePath": "data/photos/83b4e9a4-fa97-4fd3-9306-f95d1170580d.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:21.143Z"
+    },
+    {
+      "id": "f00efba1-4d1e-43c7-be67-b80b2a21d07a",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-24",
+      "caption": "IMG 3153",
+      "imagePath": "data/photos/f00efba1-4d1e-43c7-be67-b80b2a21d07a.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:21.302Z"
+    },
+    {
+      "id": "9d9f3516-e5b6-4f40-a7e2-7347826fe244",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-25",
+      "caption": "IMG 3233",
+      "imagePath": "data/photos/9d9f3516-e5b6-4f40-a7e2-7347826fe244.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:20.290Z"
+    },
+    {
+      "id": "b999e952-ecd5-4cc1-b06e-ddf329091b6c",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-25",
+      "caption": "IMG 3205",
+      "imagePath": "data/photos/b999e952-ecd5-4cc1-b06e-ddf329091b6c.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:20.504Z"
+    },
+    {
+      "id": "55fab50e-1ed4-4373-b9b8-0c2ea345cc41",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-25",
+      "caption": "IMG 3202",
+      "imagePath": "data/photos/55fab50e-1ed4-4373-b9b8-0c2ea345cc41.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:20.653Z"
+    },
+    {
+      "id": "057da267-2ad0-471d-85c1-f16cb2a9c020",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-25",
+      "caption": "IMG 3228",
+      "imagePath": "data/photos/057da267-2ad0-471d-85c1-f16cb2a9c020.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:20.801Z"
+    },
+    {
+      "id": "aa167dce-2120-4bdc-87c9-0cbe66c89f2f",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-25",
+      "caption": "IMG 3223",
+      "imagePath": "data/photos/aa167dce-2120-4bdc-87c9-0cbe66c89f2f.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:20.978Z"
+    },
+    {
+      "id": "24b4fe0f-b69f-4f64-b54c-ab158e0bb001",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-26",
+      "caption": "IMG 3256",
+      "imagePath": "data/photos/24b4fe0f-b69f-4f64-b54c-ab158e0bb001.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:19.584Z"
+    },
+    {
+      "id": "2ae58608-321d-48df-bee4-0dbbaad042af",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-26",
+      "caption": "IMG 3271",
+      "imagePath": "data/photos/2ae58608-321d-48df-bee4-0dbbaad042af.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:19.730Z"
+    },
+    {
+      "id": "2efff53b-4597-4cfc-8b6d-47496bc8737a",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-26",
+      "caption": "IMG 3268",
+      "imagePath": "data/photos/2efff53b-4597-4cfc-8b6d-47496bc8737a.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:19.856Z"
+    },
+    {
+      "id": "8fd943d3-b142-4fad-ba7a-087a24b1bc6f",
+      "owner": "Choi Ho-seok",
+      "date": "2025-12-26",
+      "caption": "IMG 3265",
+      "imagePath": "data/photos/8fd943d3-b142-4fad-ba7a-087a24b1bc6f.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:19.986Z"
+    },
+    {
+      "id": "5e1ca2ca-faf2-4110-8047-e262423e15c5",
+      "owner": "Choi Ho-seok",
+      "date": "2026-01-08",
+      "caption": "IMG 0003",
+      "imagePath": "data/photos/5e1ca2ca-faf2-4110-8047-e262423e15c5.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:19.403Z"
+    },
+    {
+      "id": "c57d408d-d54f-41f8-8a50-6067f1bf00b3",
+      "owner": "Choi Ho-seok",
+      "date": "2026-01-16",
+      "caption": "lp image",
+      "imagePath": "data/photos/c57d408d-d54f-41f8-8a50-6067f1bf00b3.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:19.173Z"
+    },
+    {
+      "id": "3fe6367a-8a86-470a-b3e9-ff02b2880da2",
+      "owner": "Choi Ho-seok",
+      "date": "2026-01-16",
+      "caption": "IMG 8112",
+      "imagePath": "data/photos/3fe6367a-8a86-470a-b3e9-ff02b2880da2.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:19.275Z"
+    },
+    {
+      "id": "b99d2329-4083-4ab1-ba02-e1301bfe52d1",
+      "owner": "Choi Ho-seok",
+      "date": "2026-01-16",
+      "caption": "IMG 3244",
+      "imagePath": "data/photos/b99d2329-4083-4ab1-ba02-e1301bfe52d1.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:20.125Z"
+    },
+    {
+      "id": "7770239a-cde5-4e8a-aa8b-99bb92647e9b",
+      "owner": "Choi Ho-seok",
+      "date": "2026-01-16",
+      "caption": "IMG 8166",
+      "imagePath": "data/photos/7770239a-cde5-4e8a-aa8b-99bb92647e9b.jpg",
+      "isShared": true,
+      "createdAt": "2026-07-10T11:10:21.859Z"
+    },
     {
       "id": "4d1cfa30-746b-4e78-81bd-d8092d1621b4",
       "owner": "Choi Ho-seok",
