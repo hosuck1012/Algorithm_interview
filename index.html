@@ -1,0 +1,184 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Our Orbit</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="is-locked">
+    <section class="login-gate" id="loginGate" aria-label="Private access login">
+      <div class="login-card">
+        <p class="eyebrow">Private Orbit</p>
+        <h1>Enter Our Orbit</h1>
+        <p class="login-card__copy">This photo constellation is reserved for two travelers.</p>
+
+        <form class="login-form" id="loginForm">
+          <label>
+            ID
+            <input id="loginUser" type="text" inputmode="numeric" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input id="loginPassword" type="password" inputmode="numeric" autocomplete="current-password" required />
+          </label>
+          <p class="login-error" id="loginError" hidden>Access denied. Check the ID and password.</p>
+          <button type="submit">Enter orbit</button>
+        </form>
+      </div>
+    </section>
+
+    <main class="ship-app">
+      <section class="space-viewport" id="spaceViewport" tabindex="0" aria-label="Spaceship-view photo constellation">
+        <canvas id="starCanvas" aria-hidden="true"></canvas>
+        <canvas id="constellationCanvas" aria-hidden="true"></canvas>
+        <div class="memory-space" id="memorySpace"></div>
+
+        <div class="crosshair" aria-hidden="true">
+          <span></span>
+          <span></span>
+        </div>
+
+        <header class="ship-hud ship-hud--top">
+          <div class="ship-mark">
+            <p class="eyebrow">Our Orbit</p>
+          </div>
+          <div class="flight-stats" aria-live="polite">
+            <span id="memoryCount">0 memories</span>
+            <span id="activeDate">Standby</span>
+            <span id="shipPosition">X 0 · Y 0 · Z 0</span>
+            <button class="logout-button" id="logoutButton" type="button">Log out</button>
+          </div>
+        </header>
+
+        <aside class="control-dock" aria-label="Photo upload and flight controls">
+          <div class="dock-copy">
+            <p class="eyebrow">Flight Deck</p>
+            <p>Move with WASD, drag the mouse to rotate, and use the wheel to move forward or backward.</p>
+          </div>
+          <section class="sync-panel" id="syncPanel" aria-label="Shared photo storage">
+            <div class="sync-panel__header">
+              <p class="eyebrow">Shared Storage</p>
+              <span id="syncStatus">Connecting...</span>
+            </div>
+            <label>
+              GitHub write token
+              <input
+                id="githubTokenInput"
+                type="password"
+                autocomplete="off"
+                placeholder="Required for upload and delete"
+              />
+            </label>
+            <div class="sync-actions">
+              <button id="saveTokenButton" type="button">Save token</button>
+              <button id="syncLocalButton" type="button">Sync this device</button>
+              <button id="refreshButton" type="button">Refresh shared photos</button>
+            </div>
+            <small class="field-hint" id="syncHint">Shared photos are loaded from the GitHub repository. Uploads need a write token on this device.</small>
+          </section>
+          <form class="upload-panel" id="uploadForm">
+            <label class="drop-zone" id="dropZone" for="photoInput">
+              <input id="photoInput" type="file" accept="image/*" multiple required />
+              <span class="drop-zone__preview" id="photoPreview"></span>
+              <span class="drop-zone__icon">+</span>
+              <span class="drop-zone__text" id="fileName">Choose or drag photos</span>
+            </label>
+
+            <div class="field-grid">
+              <label>
+                Person
+                <select id="ownerInput" required>
+                  <option value="Choi Ho-seok">Choi Ho-seok</option>
+                  <option value="Jung Hye-jun">Jung Hye-jun</option>
+                </select>
+              </label>
+              <label>
+                Date
+                <input id="dateInput" type="date" required />
+                <small class="field-hint" id="photoDateHint">If the photo includes a capture date, it will be filled automatically.</small>
+              </label>
+            </div>
+
+            <label>
+              Memory caption
+              <input
+                id="captionInput"
+                type="text"
+                maxlength="60"
+                placeholder="Example: The night we first watched the stars together"
+              />
+            </label>
+
+            <button type="submit">Launch photo into space</button>
+          </form>
+
+          <div class="navigation-bar">
+            <label class="time-control">
+              <span>Time warp</span>
+              <input id="timeSlider" type="range" min="0" max="0" value="0" />
+            </label>
+            <div class="button-grid">
+              <button id="playButton" type="button">Auto cruise</button>
+              <button id="seedButton" type="button">100 samples</button>
+              <button id="clearButton" type="button">Delete samples</button>
+            </div>
+          </div>
+        </aside>
+
+        <article class="current-memory" id="currentMemory" aria-live="polite">
+          <p class="eyebrow">Current Signal</p>
+          <h2>No nearby photo signal.</h2>
+          <p>Fly toward a photo to see the memory you are facing here.</p>
+        </article>
+
+        <section class="mission-log" aria-label="Chronological photo list">
+          <div class="mission-log__header">
+            <p class="eyebrow">Constellation Log</p>
+            <h2>Chronological coordinates</h2>
+          </div>
+          <div class="timeline" id="timeline"></div>
+        </section>
+
+        <div class="empty-state" id="emptyState">
+          <p class="eyebrow">No Signal</p>
+          <h2>Upload a photo to create the first coordinate in space.</h2>
+          <p>100 sample photos are ready for initial testing.</p>
+        </div>
+
+        <div class="cockpit" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </section>
+    </main>
+
+    <template id="memoryNodeTemplate">
+      <article class="memory-node" role="button" tabindex="0">
+        <span class="node-glow" aria-hidden="true"></span>
+        <img alt="" />
+        <div class="node-caption">
+          <span class="node-date"></span>
+          <strong></strong>
+        </div>
+      </article>
+    </template>
+
+    <template id="timelineItemTemplate">
+      <article class="log-row">
+        <button class="log-row__select" type="button">
+          <img alt="" />
+          <span>
+            <small class="memory-card__date"></small>
+            <strong></strong>
+            <em></em>
+          </span>
+        </button>
+        <button class="log-row__delete" type="button" aria-label="Delete photo">Delete</button>
+      </article>
+    </template>
+
+    <script src="script.js"></script>
+  </body>
+</html>
